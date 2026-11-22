@@ -5,6 +5,7 @@ import {
 import { z } from 'zod';
 import type { Ctx } from '../env';
 import { fail } from './http';
+import type { SignupDevice } from './signup-device';
 import { guessDeviceName, now, parseJson, userAgent } from './util';
 import { putChallenge, rpInfo, type ChallengeRow } from './webauthn';
 
@@ -33,7 +34,10 @@ export function transportsOf(row: CredentialRow) {
 export async function registrationOptions(
   c: Ctx,
   kind: 'register' | 'add-passkey',
-  user: { id: string; username: string; displayName: string; consent?: { version: string; acceptedAt: number } },
+  user: {
+    id: string; username: string; displayName: string;
+    consent?: { version: string; acceptedAt: number }; device?: SignupDevice | null;
+  },
   existing: CredentialRow[] = [],
 ) {
   const rp = rpInfo(c);

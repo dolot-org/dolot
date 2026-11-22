@@ -119,6 +119,7 @@ The [Build workflow](.github/workflows/build.yml) runs for pushes to `main`, pul
 | `ADMIN_USERNAMES` | Grants administrator access to matching usernames at registration. Create the initial administrator accounts before opening public registration, then clear the bootstrap list. Use the admin console to manage existing roles. |
 | `CF_API_TOKEN` | Add as a Worker secret with Zone Read and DNS Edit permissions scoped to the zones Dotlo manages. Use `CF_MOCK=true` for local simulation. |
 | `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET` | Configure both to enable human verification for registrations and reports. Store the secret as a Worker secret. |
+| `DEVICE_FINGERPRINT_SECRET` | Set a stable random Worker secret to enable duplicate-account checks. Apply `0006_signup_devices.sql` before enabling it. |
 | `REQUIRE_PWA` | Enabled by default. Set to `false` to make restricted features available in a regular browser window. |
 
 ### Built-in Mail

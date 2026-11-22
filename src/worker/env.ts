@@ -23,6 +23,7 @@ export interface Env {
   /** 以这些用户名注册的账户自动成为管理员 逗号分隔 */
   ADMIN_USERNAMES?: string;
   REQUIRE_PWA?: string;
+  DEVICE_FINGERPRINT_SECRET?: string;
   TURNSTILE_SITE_KEY?: string;
   TURNSTILE_SECRET?: string;
 }

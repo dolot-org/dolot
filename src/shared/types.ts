@@ -121,6 +121,7 @@ export interface ActivityItem {
 export interface PublicConfig {
   siteName: string;
   registrationOpen: boolean;
+  deviceRegistrationCheck: boolean;
   requirePwa: boolean;
   turnstileSiteKey: string | null;
   announcement: string;

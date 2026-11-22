@@ -7,7 +7,7 @@ import { source } from '../lib/source';
 export function Agreement() {
   const { tr } = useLocale();
   return <article className="narrow stack legal-document">
-    <PageTitle title={tr('用户协议', 'User Agreement')} subtitle={tr('生效日期', 'Effective date') + ' ' + LEGAL_VERSION} />
+    <PageTitle title={tr('用户协议', 'User Agreement')} subtitle={tr('版本', 'Version') + ' ' + LEGAL_VERSION} />
     <Panel title={tr('协议范围与同意', 'Scope and acceptance')}>
       <p>{tr(
         '本协议适用于你在此 Dotlo 站点创建账户及使用域名管理功能。注册前请阅读本协议和服务条款。勾选同意并完成注册后，两个文件共同适用于你的账户和对服务的使用。',
@@ -39,6 +39,10 @@ export function Agreement() {
         'Dotlo uses sign-in IP addresses, browser information, activity logs, and request rates to maintain sessions, prevent abuse, and troubleshoot. Abuse reports may include a domain name, details, your contact information, and technical information used to handle the report. Your browser stores the session cookie, language and theme preferences, and the app cache.',
       )}</p>
       <p>{tr(
+        '启用设备注册检查时，Dotlo 使用站点专用 Cookie 和由浏览器特征及网络范围生成的指纹来阻止重复注册。服务器仅保存用于匹配的加密摘要，删除账户时会移除关联。',
+        'When device registration checks are enabled, Dotlo uses a site-specific cookie and a fingerprint based on browser characteristics and network range to prevent duplicate registrations. The server stores keyed digests for matching and removes the association when the account is deleted.',
+      )}</p>
+      <p>{tr(
         'Cloudflare 提供网站运行和 DNS 服务。启用 Turnstile 时，注册或举报也会通过 Cloudflare 进行人机验证。已发布的 DNS 记录和其中的值可被 Internet 上的任何人查询，请勿在记录中填写密码、密钥或其他敏感信息。',
         'Cloudflare provides hosting and DNS. When Turnstile is enabled, Cloudflare also handles human verification for registration or abuse reports. Anyone on the internet can query published DNS records and their values. Keep passwords, keys, and other sensitive information out of DNS records.',
       )}</p>
@@ -66,7 +70,7 @@ export function Agreement() {
 export function Terms() {
   const { tr } = useLocale();
   return <article className="narrow stack legal-document">
-    <PageTitle title={tr('服务条款', 'Terms of Service')} subtitle={tr('生效日期', 'Effective date') + ' ' + LEGAL_VERSION} />
+    <PageTitle title={tr('服务条款', 'Terms of Service')} subtitle={tr('版本', 'Version') + ' ' + LEGAL_VERSION} />
     <Panel title={tr('服务与域名使用权', 'Service and domain rights')}>
       <p>{tr(
         'Dotlo 提供免费的二级域名或子域名注册及 DNS 管理。成功认领后，你可在该后缀的规则和登记期限内管理获分配的名称。分配仅赋予在本站规则内管理该子域名的权限，父域名的所有权和注册人资格由原权利人保留。',

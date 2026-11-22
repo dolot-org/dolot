@@ -26,5 +26,5 @@ async function register<T>(path: string, data?: object) {
   return api<T>(path + '/verify', 'POST', { challengeId, response });
 }
 
-export const signUp = (data: { username: string; displayName: string; legalVersion: string; token?: string }) => register<Me>('/auth/register', data);
+export const signUp = (data: { username: string; displayName: string; legalVersion: string; token?: string; fingerprint?: string }) => register<Me>('/auth/register', data);
 export const addPasskey = () => register<{ id: string }>('/account/passkeys');

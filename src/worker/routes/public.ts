@@ -56,7 +56,8 @@ publicRoutes.get('/config', async (c) => {
     domainCapacity(DB),
   ]);
   const result: PublicConfig = {
-    siteName: c.env.RP_NAME || 'Dotlo', registrationOpen: settings.registrationOpen, requirePwa: c.env.REQUIRE_PWA !== 'false',
+    siteName: c.env.RP_NAME || 'Dotlo', registrationOpen: settings.registrationOpen,
+    deviceRegistrationCheck: Boolean(c.env.DEVICE_FINGERPRINT_SECRET), requirePwa: c.env.REQUIRE_PWA !== 'false',
     turnstileSiteKey: c.env.TURNSTILE_SECRET ? c.env.TURNSTILE_SITE_KEY ?? null : null,
     announcement: settings.announcement, contactEmail: settings.contactEmail,
     roots: roots.results.map(rootDto), stats: counts ?? { users: 0, subdomains: 0 },

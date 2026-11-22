@@ -10,8 +10,11 @@ import { challengeRp, credentialStatement, registrationOptions, transportsOf, ve
 import { userQuota } from '../lib/domains';
 import { adminUsernames, rateLimit, verifyTurnstile } from '../lib/guard';
 import { fail, readBody } from '../lib/http';
-import { createSession, destroySession, pwaGuard } from '../lib/session';
+import { createSession, currentUser, destroySession, pwaGuard, requireUser } from '../lib/session';
 import { getSettings } from '../lib/settings';
+import {
+  assertSignupDevice, existingDevice, fingerprintInput, insertSignupDevice, signupDevice, type SignupDevice,
+} from '../lib/signup-device';
 import { cleanText, clientIp, isUniqueError, now, parseJson, randomId } from '../lib/util';
 import { putChallenge, rpInfo, takeChallenge } from '../lib/webauthn';
 
@@ -34,12 +37,25 @@ auth.post('/logout', async (c) => {
   return c.json({ ok: true });
 });
 
+// Enrol existing accounts when they next open the signed-in app.
+auth.post('/device', requireUser, pwaGuard, async (c) => {
+  const { DB, DEVICE_FINGERPRINT_SECRET } = c.env;
+  if (!DEVICE_FINGERPRINT_SECRET) return c.json({ ok: true });
+  const user = currentUser(c);
+  if (await DB.prepare('SELECT 1 FROM signup_devices WHERE user_id = ?').bind(user.id).first()) return c.json({ ok: true });
+  const { fingerprint } = await readBody(c, z.object({ fingerprint: fingerprintInput }));
+  const device = await signupDevice(c, fingerprint);
+  if (device) await insertSignupDevice(DB, user.id, device, true).run();
+  return c.json({ ok: true });
+});
+
 auth.post('/register/options', pwaGuard, async (c) => {
   const { DB } = c.env;
+  if (c.get('user')) fail(409, 'signup_device_used');
   await rateLimit(DB, 'register:' + clientIp(c), 12, 3_600_000);
   const body = await readBody(c, z.object({
     username: z.string().max(100), displayName: z.string().max(50).optional(), token: z.string().max(2048).optional(),
-    legalVersion: z.string().max(40).optional(),
+    legalVersion: z.string().max(40).optional(), fingerprint: fingerprintInput,
   }));
   const username = normalizeUsername(body.username);
   if (!USERNAME_RE.test(username)) fail(400, 'username_invalid');
@@ -48,21 +64,27 @@ auth.post('/register/options', pwaGuard, async (c) => {
   const consent = { version: body.legalVersion, acceptedAt: now() };
   await verifyTurnstile(c, body.token);
   if (await DB.prepare('SELECT id FROM users WHERE username = ?').bind(username).first()) fail(409, 'username_taken');
+  const device = await signupDevice(c, body.fingerprint);
+  if (device && await existingDevice(DB, device)) fail(409, 'signup_device_used');
   return c.json(await registrationOptions(c, 'register', {
-    id: randomId(16), username, displayName: cleanText(body.displayName ?? '', 50), consent,
+    id: randomId(16), username, displayName: cleanText(body.displayName ?? '', 50), consent, device,
   }));
 });
 
 auth.post('/register/verify', pwaGuard, async (c) => {
   const { DB } = c.env;
+  if (c.get('user')) fail(409, 'signup_device_used');
   await rateLimit(DB, 'register-verify:' + clientIp(c), 20, 3_600_000);
   if (!(await getSettings(DB)).registrationOpen) fail(403, 'registration_closed');
   const body = await readBody(c, verificationBody);
   const challenge = await takeChallenge(DB, body.challengeId, 'register');
-  const data = parseJson<{ username: string; displayName: string; consent?: { version: string; acceptedAt: number } } | null>(challenge.data, null);
+  const data = parseJson<{
+    username: string; displayName: string; consent?: { version: string; acceptedAt: number }; device?: SignupDevice | null;
+  } | null>(challenge.data, null);
   const id = challenge.user_id;
   if (!id || !data) fail(400, 'passkey_failed');
   if (data.consent?.version !== LEGAL_VERSION) fail(400, 'legal_consent_required');
+  await assertSignupDevice(c, data.device);
   const credential = await credentialStatement(c, challenge, body.response, id);
   const t = now();
   const user: UserRow = {
@@ -73,6 +95,7 @@ auth.post('/register/verify', pwaGuard, async (c) => {
     await DB.batch([
       DB.prepare('INSERT INTO users (id, username, display_name, role, created_at, last_login_at) VALUES (?, ?, ?, ?, ?, ?)')
         .bind(id, user.username, user.display_name, user.role, t, t),
+      ...(data.device ? [insertSignupDevice(DB, id, data.device)] : []),
       credential.statement,
       DB.prepare('INSERT INTO user_agreements (user_id, version, accepted_at) VALUES (?, ?, ?)')
         .bind(id, data.consent.version, data.consent.acceptedAt),
@@ -80,6 +103,7 @@ auth.post('/register/verify', pwaGuard, async (c) => {
     ]);
   } catch (error) {
     if (isUniqueError(error)) {
+      if (data.device && await existingDevice(DB, data.device)) fail(409, 'signup_device_used');
       if (await DB.prepare('SELECT id FROM users WHERE username = ?').bind(user.username).first()) fail(409, 'username_taken');
       fail(409, 'passkey_failed');
     }

@@ -9,6 +9,7 @@ import { Turnstile } from '../components/Turnstile';
 import { ActionFeedback, Empty, Field, formData, Meter, PageTitle, textValue, useAction } from '../components/ui';
 import { api, setMe } from '../lib/api';
 import { signIn, signUp } from '../lib/passkey';
+import { deviceFingerprint } from '../lib/device';
 import { install, usePwa } from '../lib/pwa';
 import { useLocale } from '../lib/preferences';
 
@@ -125,7 +126,10 @@ export function SignUp({ config }: { config: PublicConfig }) {
         if (legalVersion !== LEGAL_VERSION) return;
         void action.run(async () => {
           try {
-            setMe(await signUp({ username: textValue(form, 'username'), displayName: textValue(form, 'name'), legalVersion, token: token || undefined }));
+            const fingerprint = config.deviceRegistrationCheck ? await deviceFingerprint() : undefined;
+            setMe(await signUp({
+              username: textValue(form, 'username'), displayName: textValue(form, 'name'), legalVersion, token: token || undefined, fingerprint,
+            }));
             navigate(next, { replace: true });
           } finally {
             setRevision((value) => value + 1);
@@ -146,6 +150,9 @@ export function SignUp({ config }: { config: PublicConfig }) {
             <Link className="text-link" to="/terms" target="_blank" rel="noopener">{tr('服务条款', 'Terms of Service')}</Link>
           </span>
         </div>
+        {config.deviceRegistrationCheck && <small>{tr(
+          '本站使用设备指纹防止重复注册', 'Dotlo uses a device fingerprint to prevent duplicate registrations',
+        )}</small>}
         <Turnstile siteKey={config.turnstileSiteKey} revision={revision} update={setToken} />
         <button className="button primary wide" disabled={action.busy || !accepted || Boolean(config.turnstileSiteKey && !token)}>
           {action.busy ? <LoaderCircle className="spin" size={18} aria-hidden="true" /> : <KeyRound size={18} aria-hidden="true" />}{tr('创建 Passkey', 'Create passkey')}

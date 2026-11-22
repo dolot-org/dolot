@@ -1,9 +1,10 @@
 import { Navigate, Route, Routes, useLocation } from 'react-router';
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import type { Me } from '../shared/types';
 import { AppShell } from './components/AppShell';
 import { QueryState } from './components/ui';
-import { useConfig, useMe } from './lib/api';
+import { api, useConfig, useMe } from './lib/api';
+import { deviceFingerprint } from './lib/device';
 import { usePwa } from './lib/pwa';
 import { Account } from './pages/Account';
 import { Admin } from './pages/Admin';
@@ -32,6 +33,12 @@ export function App() {
   const config = configQuery.data;
   const me = meQuery.data ?? null;
   const needsInstall = Boolean(config?.requirePwa && !pwa.standalone);
+  const deviceCheck = config?.deviceRegistrationCheck;
+  const userId = me?.id;
+  useEffect(() => {
+    if (!userId || !deviceCheck || needsInstall) return;
+    void deviceFingerprint().then((fingerprint) => api('/auth/device', 'POST', { fingerprint })).catch(() => {});
+  }, [userId, deviceCheck, needsInstall]);
   const information = <>
     <Route path="about" element={<About contact={config?.contactEmail} />} />
     <Route path="agreement" element={<Agreement />} />
