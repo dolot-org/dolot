@@ -1,0 +1,43 @@
+{
+  "name": "dotlo",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "packageManager": "pnpm@12.15.0",
+  "scripts": {
+    "dev": "vite",
+    "dev:api": "node -e \"require('fs').mkdirSync('dist/client',{recursive:true})\" && wrangler dev --port 8787",
+    "build": "tsc -b && vite build",
+    "check:worker": "wrangler deploy --dry-run --outdir dist/worker",
+    "deploy": "pnpm run build && wrangler deploy",
+    "db:migrate:local": "wrangler d1 migrations apply dotlo --local",
+    "db:migrate:remote": "wrangler d1 migrations apply dotlo --remote",
+    "icons": "node scripts/icons.mjs"
+  },
+  "dependencies": {
+    "@fontsource-variable/unbounded": "^5.2.6",
+    "@fontsource/ibm-plex-mono": "^5.2.6",
+    "@simplewebauthn/browser": "^13.1.2",
+    "@simplewebauthn/server": "^13.1.2",
+    "@tanstack/react-query": "^5.85.0",
+    "hono": "^4.9.0",
+    "lucide-react": "^0.540.0",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "react-router": "^7.8.0",
+    "zod": "^4.0.17"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250816.0",
+    "@tailwindcss/vite": "^4.1.12",
+    "@types/node": "^22.17.0",
+    "@types/react": "^19.1.10",
+    "@types/react-dom": "^19.1.7",
+    "@vitejs/plugin-react": "^5.0.0",
+    "tailwindcss": "^4.1.12",
+    "typescript": "~5.9.2",
+    "vite": "^7.1.2",
+    "vite-plugin-pwa": "^1.0.3",
+    "wrangler": "^4.30.0"
+  }
+}

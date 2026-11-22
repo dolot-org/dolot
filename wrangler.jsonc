@@ -1,0 +1,30 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "dotlo",
+  "main": "src/worker/index.ts",
+  "compatibility_date": "2025-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "./dist/client",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "dotlo",
+      // 运行 wrangler d1 create dotlo 后替换
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+  // 每小时处理到期 回收和清理
+  "triggers": { "crons": ["17 * * * *"] },
+  "vars": {
+    "RP_NAME": "Dotlo",
+    "REQUIRE_PWA": "true",
+    "ADMIN_USERNAMES": ""
+  },
+  "observability": { "enabled": true }
+}

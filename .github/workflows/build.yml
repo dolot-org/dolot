@@ -1,0 +1,39 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      WRANGLER_SEND_METRICS: 'false'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Compile TypeScript and build PWA
+        run: pnpm build
+      - name: Bundle Cloudflare Worker
+        run: pnpm check:worker
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dotlo-build
+          path: |
+            dist/client/
+            dist/worker/
+          if-no-files-found: error

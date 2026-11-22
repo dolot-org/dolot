@@ -1,0 +1,9 @@
+# 复制为 .dev.vars 供 wrangler dev 使用
+# 本地不连 Cloudflare 时用模拟解析
+CF_MOCK=true
+# CF_API_TOKEN=
+REQUIRE_PWA=false
+ORIGINS=http://localhost:5173
+ADMIN_USERNAMES=admin
+# TURNSTILE_SITE_KEY=
+# TURNSTILE_SECRET=

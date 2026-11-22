@@ -1,0 +1,92 @@
+export type Lang = 'zh' | 'en';
+export type MessageParams = Record<string, string | number>;
+
+type Pair = readonly [zh: string, en: string];
+
+export const MESSAGES = {
+  internal: ['服务出了点问题 请稍后再试', 'Something went wrong on our side, try again later'],
+  not_found: ['没有找到相关内容', 'Nothing was found here'],
+  bad_request: ['提交的内容不完整或格式有误', 'The request is incomplete or malformed'],
+  unauthorized: ['登录已失效 请重新登录', 'Your session has ended, sign in again'],
+  forbidden: ['没有权限执行这个操作', 'You do not have permission to do this'],
+  banned: ['账户已被停用 {reason}', 'This account has been suspended {reason}'],
+  pwa_required: ['请安装 Dotlo 应用后从应用中打开', 'Install the Dotlo app and open it from there'],
+  csrf: ['无法验证请求来源', 'The request origin could not be verified'],
+  rate_limited: ['操作太频繁 请稍后再试', 'Too many attempts, try again later'],
+  turnstile_failed: ['人机验证未通过 请重试', 'Verification failed, try again'],
+  registration_closed: ['暂未开放新账户注册', 'New sign-ups are closed for now'],
+  username_invalid: ['用户名需为 3 到 24 位小写字母 数字 下划线或连字符 首尾为字母或数字', 'Usernames are 3 to 24 lowercase letters, digits, underscores or hyphens, starting and ending with a letter or digit'],
+  username_taken: ['这个用户名已被使用', 'This username is taken'],
+  passkey_failed: ['Passkey 验证失败 请重试', 'Passkey verification failed, try again'],
+  passkey_unknown: ['这个 Passkey 没有绑定任何账户', 'This passkey is not linked to any account'],
+  challenge_expired: ['验证已过期 请重新开始', 'This verification expired, start again'],
+  passkey_last: ['至少需要保留一个 Passkey', 'Keep at least one passkey'],
+  confirm_mismatch: ['确认内容不一致', 'The confirmation text does not match'],
+  root_unavailable: ['这个后缀暂不开放注册', 'This domain is not open for registration'],
+  label_empty: ['请输入名称', 'Enter a name'],
+  label_short: ['名称至少 {min} 个字符', 'Names need at least {min} characters'],
+  label_long: ['名称最多 {max} 个字符', 'Names can have at most {max} characters'],
+  label_charset: ['只能使用小写字母 数字和连字符', 'Use lowercase letters, digits and hyphens only'],
+  label_hyphen: ['不能以连字符开头或结尾', 'Names cannot start or end with a hyphen'],
+  label_punycode: ['第三和第四个字符不能同时是连字符', 'The third and fourth characters cannot both be hyphens'],
+  label_reserved: ['这个名称被保留 无法注册', 'This name is reserved'],
+  label_taken: ['这个名称已被注册', 'This name is already registered'],
+  fqdn_too_long: ['完整域名超过 253 个字符', 'The full domain exceeds 253 characters'],
+  quota_reached: ['已达到注册上限 {quota} 个', 'You have reached your limit of {quota} names'],
+  claim_limit: ['今天注册的次数已用完 明天再来', 'You have used today’s registrations, come back tomorrow'],
+  subdomain_suspended: ['域名已被暂停 无法修改', 'This name is suspended and cannot be changed'],
+  subdomain_expired: ['域名已过期 续期后才能修改', 'This name has expired, renew it to make changes'],
+  records_limit: ['每个域名最多 {max} 条记录', 'Each name can have at most {max} records'],
+  type_not_allowed: ['这个后缀不支持 {type} 记录', 'This domain does not allow {type} records'],
+  host_invalid: ['主机名格式有误', 'The host name is invalid'],
+  host_too_long: ['主机名太长', 'The host name is too long'],
+  srv_host: ['SRV 记录的主机名需以 _服务._协议 开头 例如 _sip._tcp', 'SRV hosts start with _service._proto, for example _sip._tcp'],
+  ttl_invalid: ['TTL 需为自动或 60 到 86400 秒', 'TTL must be auto or 60 to 86400 seconds'],
+  proxy_disabled: ['这个后缀不支持代理', 'Proxying is not available on this domain'],
+  content_ipv4: ['请输入有效的 IPv4 地址', 'Enter a valid IPv4 address'],
+  content_ipv6: ['请输入有效的 IPv6 地址', 'Enter a valid IPv6 address'],
+  content_host: ['请输入有效的主机名', 'Enter a valid host name'],
+  content_self: ['记录不能指向自身', 'A record cannot point to itself'],
+  content_empty: ['请输入内容', 'Enter the content'],
+  content_long: ['内容最多 {max} 个字符', 'Content can have at most {max} characters'],
+  content_text: ['内容包含不可见的控制字符', 'The content contains control characters'],
+  priority_invalid: ['优先级需为 0 到 65535', 'Priority must be 0 to 65535'],
+  weight_invalid: ['权重需为 0 到 65535', 'Weight must be 0 to 65535'],
+  port_invalid: ['端口需为 0 到 65535', 'Port must be 0 to 65535'],
+  caa_flags: ['CAA 标志只能是 0 或 128', 'CAA flags must be 0 or 128'],
+  caa_tag: ['CAA 标签只能是 issue issuewild 或 iodef', 'CAA tags are issue, issuewild or iodef'],
+  caa_value: ['CAA 值不能为空 也不能包含引号', 'CAA values cannot be empty or contain quotes'],
+  comment_long: ['备注最多 {max} 个字符', 'Notes can have at most {max} characters'],
+  conflict_cname: ['CNAME 记录不能与同名的其他记录共存', 'A CNAME cannot share its name with other records'],
+  conflict_ns: ['NS 记录不能与同名的其他类型记录共存', 'NS records cannot share their name with other record types'],
+  conflict_delegated: ['这个名称已委派给其他域名服务器 不能在其下添加记录', 'This name is delegated to other name servers, records below it are not allowed'],
+  record_duplicate: ['已存在相同的记录', 'An identical record already exists'],
+  dns_provider: ['Cloudflare 拒绝了这次修改 {detail}', 'Cloudflare rejected this change {detail}'],
+  dns_unconfigured: ['解析服务尚未配置 请联系管理员', 'DNS is not configured yet, contact an administrator'],
+  renew_not_open: ['还没到续期时间', 'Renewal is not open yet'],
+  renew_not_needed: ['这个域名长期有效 无需续期', 'This name does not expire'],
+  transfer_invalid: ['转移码无效或已过期', 'The transfer code is invalid or expired'],
+  transfer_self: ['这个域名已经属于你', 'You already own this name'],
+  transfer_blocked: ['暂停或过期的域名不能转移', 'Suspended or expired names cannot be transferred'],
+  root_exists: ['这个域名已经添加过了', 'This domain has already been added'],
+  zone_invalid: ['请填写有效的区域 ID 和域名', 'Enter a valid zone ID and domain'],
+  zone_inaccessible: ['API 令牌无法访问这个区域', 'The API token cannot access this zone'],
+  root_in_use: ['这个后缀下还有域名 无法删除', 'This domain still has names registered under it'],
+  length_range: ['最短长度不能大于最长长度', 'The minimum length cannot exceed the maximum'],
+  user_not_found: ['没有找到这个用户', 'No user was found'],
+  account_in_use: ['请先释放或转移全部域名', 'Release or transfer all your domains first'],
+  busy: ['这项操作正在进行 请稍后再试', 'This operation is in progress, try again shortly'],
+  self_action: ['不能对自己的账户执行这个操作', 'You cannot do this to your own account'],
+  resolve_scope: ['只能查询本站后缀下的域名', 'Only names under Dotlo domains can be looked up'],
+  status_invalid: ['当前状态下不能执行这个操作', 'This action is not available in the current state'],
+} as const satisfies Record<string, Pair>;
+
+export type MessageCode = keyof typeof MESSAGES;
+
+export function formatMessage(code: MessageCode, lang: Lang, params: MessageParams = {}): string {
+  const pair: Pair = MESSAGES[code] ?? MESSAGES.internal;
+  return pair[lang === 'en' ? 1 : 0]
+    .replace(/\{(\w+)\}/g, (_, key: string) => String(params[key] ?? ''))
+    .replace(/\s+/g, ' ')
+    .trim();
+}
