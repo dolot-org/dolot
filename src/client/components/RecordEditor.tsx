@@ -11,6 +11,7 @@ export function RecordEditor({ detail, existing, save, cancel }: {
   const { lang, tr } = useLocale();
   const options = detail.root.allowedTypes;
   const [type, setType] = useState<RecordType>(existing?.type ?? options[0] ?? 'A');
+  const [content, setContent] = useState(existing?.content ?? '');
   const [proxied, setProxied] = useState(Boolean(existing?.proxied && detail.root.allowProxied));
   const action = useAction();
   const priority = type === 'MX' || type === 'SRV';
@@ -19,7 +20,7 @@ export function RecordEditor({ detail, existing, save, cancel }: {
   return <form className="inset stack" onSubmit={(event) => {
     const form = formData(event);
     const data: RecordInput = {
-      type, host: textValue(form, 'host'), content: textValue(form, 'content'), ttl: proxyAllowed && proxied ? 1 : Number(form.get('ttl')),
+      type, host: textValue(form, 'host'), content, ttl: proxyAllowed && proxied ? 1 : Number(form.get('ttl')),
       proxied: proxyAllowed && proxied, priority: priority ? Number(form.get('priority')) : null,
       weight: type === 'SRV' ? Number(form.get('weight')) : null, port: type === 'SRV' ? Number(form.get('port')) : null,
       flags: type === 'CAA' ? Number(form.get('flags')) : null, tag: type === 'CAA' ? textValue(form, 'tag') : null,
@@ -40,8 +41,8 @@ export function RecordEditor({ detail, existing, save, cancel }: {
         <input name="host" defaultValue={existing?.host ?? '@'} maxLength={253} autoCapitalize="none" />
       </Field>
       <Field label={contentLabel}>{type === 'TXT'
-        ? <textarea name="content" defaultValue={existing?.content ?? ''} required maxLength={2048} rows={3} />
-        : <input name="content" defaultValue={existing?.content ?? ''} required maxLength={2048} autoCapitalize="none" />}</Field>
+        ? <textarea name="content" value={content} onChange={(event) => setContent(event.target.value)} required maxLength={2048} rows={3} />
+        : <input name="content" value={content} onChange={(event) => setContent(event.target.value)} required maxLength={2048} autoCapitalize="none" />}</Field>
       <Field label={tr('TTL 秒', 'TTL seconds')} hint={tr('1 为自动', '1 for automatic')}>
         <input name="ttl" type="number" min={1} max={86400} required disabled={proxyAllowed && proxied} defaultValue={existing?.ttl ?? 1} />
       </Field>

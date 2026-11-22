@@ -1,9 +1,10 @@
-import { Download, KeyRound, Share, ShieldCheck } from 'lucide-react';
+import { Download, KeyRound, Search, Share, ShieldCheck } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { LEGAL_VERSION } from '../../shared/legal';
 import { REPORT_CATEGORIES, type PublicConfig, type ReportCategory } from '../../shared/types';
 import { ClaimBox } from '../components/ClaimBox';
+import { SuffixList } from '../components/SuffixList';
 import { Turnstile } from '../components/Turnstile';
 import { ActionFeedback, Empty, Field, formData, PageTitle, Panel, textValue, useAction } from '../components/ui';
 import { api, setMe } from '../lib/api';
@@ -34,33 +35,40 @@ export function InstallGate({ next }: { next: string }) {
 export function Welcome({ config, signedIn }: { config: PublicConfig; signedIn: boolean }) {
   const { tr } = useLocale();
   const pwa = usePwa();
-  const suffixes = config.roots.map((root) => '.' + root.domain);
-  const signin = config.requirePwa && !pwa.standalone ? '/install' : '/signin';
+  const installRequired = config.requirePwa && !pwa.standalone;
   const remaining = Math.max(0, config.domainCapacity.limit - config.domainCapacity.assigned);
+  const primaryPath = signedIn ? '/home' : config.registrationOpen ? '/signup' : '/signin';
+  const primaryLabel = signedIn ? tr('管理域名', 'Manage domains')
+    : config.registrationOpen ? (installRequired ? tr('安装后注册', 'Install to sign up') : tr('创建账户', 'Create account'))
+    : tr('登录', 'Sign in');
   return <div className="welcome stack">
-    <section className="hero">
+    <section className="hero" aria-labelledby="welcome-title">
       <div className="hero-text stack">
-        <h1>{tr('你的域名', 'A domain')}<br />{tr('自由解析', 'of your own')}<span className="hero-dot" aria-hidden="true" /></h1>
-        <p>{tr('免费注册二级域名 用 Passkey 登录 由 Cloudflare 解析', 'Free subdomains with passkey sign-in and Cloudflare DNS')}</p>
+        <h1 id="welcome-title">{tr('你的域名', 'A domain')}<br />{tr('自由解析', 'of your own')}<span className="hero-dot" aria-hidden="true" /></h1>
+        <p>{tr('免费注册子域名 用 Passkey 登录 由 Cloudflare 解析', 'Free subdomains with passkey sign-in and Cloudflare DNS')}</p>
         <div className="actions">
-          <Link className="button accent" to={signedIn ? '/home' : config.registrationOpen ? '/signup' : signin}>
-            {signedIn ? tr('管理域名', 'Manage domains') : config.registrationOpen ? tr('创建账户', 'Create account') : tr('登录', 'Sign in')}
+          <Link className="button accent" to={primaryPath}>
+            {!signedIn && installRequired && config.registrationOpen && <Download size={17} aria-hidden="true" />}
+            {primaryLabel}
           </Link>
-          {!signedIn && config.registrationOpen && <Link className="button on-hero" to={signin}><KeyRound size={17} />{tr('Passkey 登录', 'Passkey sign-in')}</Link>}
+          {!signedIn && config.registrationOpen && <Link className="button on-hero" to="/signin"><KeyRound size={17} aria-hidden="true" />{tr('Passkey 登录', 'Passkey sign-in')}</Link>}
         </div>
       </div>
-      <div className="hero-dns mono" aria-label={tr('可用域名后缀', 'Available domain suffixes')}>
-        <div className="hero-dns-title"><span />DNS</div>
-        {suffixes.length ? suffixes.slice(0, 4).map((suffix) => <div key={suffix}>{suffix}</div>) : <div>@ <span className="hero-dns-placeholder">yourname</span></div>}
-      </div>
+      <section className="hero-lookup stack" aria-labelledby="hero-lookup-title">
+        <div className="hero-lookup-head">
+          <span className="hero-lookup-icon" aria-hidden="true"><Search size={20} /></span>
+          <h2 id="hero-lookup-title">{tr('查找域名', 'Find a domain')}</h2>
+        </div>
+        <ClaimBox roots={config.roots} />
+      </section>
     </section>
     {config.announcement && <p className="notice" role="status">{config.announcement}</p>}
-    <Panel title={tr('查找你的域名', 'Find your domain')}><ClaimBox roots={config.roots} /></Panel>
-    <div className="public-stats">
-      <span><strong>{config.stats.subdomains.toLocaleString()}</strong> {tr('有效域名', 'active domains')}</span>
-      <span><strong>{remaining.toLocaleString()}</strong> {tr('剩余域名名额', 'domain slots remaining')}</span>
-      <span><strong>{config.stats.users.toLocaleString()}</strong> {tr('账户', 'accounts')}</span>
-    </div>
+    <dl className="public-stats">
+      <div><dt>{tr('剩余域名名额', 'Slots remaining')}</dt><dd>{remaining.toLocaleString()}</dd></div>
+      <div><dt>{tr('有效域名', 'Active domains')}</dt><dd>{config.stats.subdomains.toLocaleString()}</dd></div>
+      <div><dt>{tr('账户', 'Accounts')}</dt><dd>{config.stats.users.toLocaleString()}</dd></div>
+    </dl>
+    <SuffixList roots={config.roots} />
   </div>;
 }
 
