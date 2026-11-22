@@ -16,11 +16,16 @@ function loadPreferences(): Preferences {
 let preferences = loadPreferences();
 const listeners = new Set<() => void>();
 
+const darkScheme = matchMedia('(prefers-color-scheme: dark)');
+
 function applyPreferences() {
   document.documentElement.lang = preferences.lang === 'zh' ? 'zh-CN' : 'en';
   document.documentElement.dataset.theme = preferences.theme;
+  const dark = preferences.theme === 'dark' || (preferences.theme === 'system' && darkScheme.matches);
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#131620' : '#f1f3f7');
 }
 applyPreferences();
+darkScheme.addEventListener('change', applyPreferences);
 
 export function setPreferences(next: Partial<Preferences>) {
   preferences = { ...preferences, ...next };
@@ -42,6 +47,8 @@ export function getPreferences() {
 export function useLocale() {
   const state = useSyncExternalStore(subscribe, getPreferences);
   const tr = (zh: string, en: string) => state.lang === 'zh' ? zh : en;
-  const date = (time: number | null) => time === null ? tr('从未', 'Never') : new Intl.DateTimeFormat(state.lang === 'zh' ? 'zh-CN' : 'en', { dateStyle: 'medium', timeStyle: 'short' }).format(time);
-  return { ...state, tr, date };
+  const locale = state.lang === 'zh' ? 'zh-CN' : 'en';
+  const date = (time: number | null) => time === null ? tr('从未', 'Never') : new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(time);
+  const day = (time: number) => new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(time);
+  return { ...state, tr, date, day };
 }

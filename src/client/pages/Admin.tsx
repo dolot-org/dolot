@@ -1,3 +1,4 @@
+import { ArrowLeft } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { Link, NavLink, Route, Routes, useParams, useSearchParams } from 'react-router';
 import { DEFAULT_ALLOWED_TYPES, RECORD_TYPES, recordValue } from '../../shared/dns';
@@ -44,7 +45,7 @@ function DomainRows({ items }: { items: AdminSubdomain[] }) {
     {items.map((row) => <li key={row.id}>
       <Link className="domain-row" to={'/admin/domains/' + row.id}>
         <span className="row-main"><strong><DomainName name={row.fqdn} /></strong><small>@{row.ownerName}</small></span>
-        <DomainStatus status={row.status} /><small>{row.recordCount} {tr('条记录', 'records')}</small>
+        <small className="row-count">{row.recordCount} {tr('条记录', 'records')}</small><DomainStatus status={row.status} />
       </Link>
     </li>)}
   </ul> : <Empty>{tr('暂无域名', 'No domains found')}</Empty>;
@@ -60,15 +61,16 @@ function Overview() {
   return <div className="stack">
     <PageTitle title={tr('管理概览', 'Admin overview')} subtitle={mode[data.dnsMode]} />
     <div className="stat-grid">
-      <div><strong>{data.users}</strong><span>{tr('账户', 'Accounts')} · +{data.usersWeek} {tr('最近 7 天', 'last 7 days')}</span></div>
-      <div><strong>{data.subdomains.active}</strong><span>{tr('有效域名', 'Active domains')} · +{data.subdomainsWeek} {tr('最近 7 天', 'last 7 days')}</span></div>
-      <div><strong>{data.records}</strong><span>{tr('DNS 记录', 'DNS records')}</span></div>
-      <div><strong>{data.openReports}</strong><span>{tr('待处理举报', 'Open reports')}</span></div>
-      <div><strong>{data.roots}</strong><span>{tr('后缀', 'Suffixes')}</span></div>
+      <div><span>{tr('账户', 'Accounts')}</span><strong>{data.users}</strong><small className="trend">+{data.usersWeek} {tr('最近 7 天', 'last 7 days')}</small></div>
+      <div><span>{tr('有效域名', 'Active domains')}</span><strong>{data.subdomains.active}</strong><small className="trend">+{data.subdomainsWeek} {tr('最近 7 天', 'last 7 days')}</small></div>
+      <div><span>{tr('DNS 记录', 'DNS records')}</span><strong>{data.records}</strong></div>
+      <Link to="/admin/reports?status=open" className={data.openReports ? 'stat-alert' : undefined}><span>{tr('待处理举报', 'Open reports')}</span><strong>{data.openReports}</strong></Link>
+      <Link to="/admin/roots"><span>{tr('后缀', 'Suffixes')}</span><strong>{data.roots}</strong></Link>
     </div>
     <Panel title={tr('域名状态', 'Domain statuses')}>
-      <div className="actions">{SUB_STATUSES.map((status) => <Link key={status} className="button secondary" to={'/admin/domains?status=' + status}>
-        {statusName(status)} <span className="mono">{data.subdomains[status]}</span>
+      <div className="status-tiles">{SUB_STATUSES.map((status) => <Link key={status} className={'status-tile status-' + status} to={'/admin/domains?status=' + status}>
+        <span className="status-tile-name"><span className="dot" aria-hidden="true" />{statusName(status)}</span>
+        <strong>{data.subdomains[status]}</strong>
       </Link>)}</div>
     </Panel>
     <Panel title={tr('最近注册', 'Recent claims')}><DomainRows items={data.recent} /></Panel>
@@ -136,8 +138,9 @@ function Roots() {
     </Panel>}
     <Panel title={tr('已配置后缀', 'Configured suffixes')}>
       {query.data ? query.data.length ? <ul className="rows">{query.data.map((item) => <li className="list-row" key={item.id}>
-        <div className="row-main"><strong className="mono">.{item.domain}</strong><small>{item.description}</small></div>
-        <small>{item.status === 'active' ? tr('开放', 'Open') : tr('暂停', 'Paused')} · {item.subdomainCount} {tr('个域名', 'domains')}</small>
+        <div className="row-main"><strong className="mono">.{item.domain}</strong>{item.description && <small>{item.description}</small>}</div>
+        <small className="row-count">{item.subdomainCount} {tr('个域名', 'domains')}</small>
+        <span className={'chip ' + (item.status === 'active' ? 'status-active' : 'status-idle')}>{item.status === 'active' ? tr('开放', 'Open') : tr('暂停', 'Paused')}</span>
         <button className="button minor" onClick={() => setEditing(item.id)}>{tr('编辑', 'Edit')}</button>
       </li>)}</ul> : <Empty>{tr('暂无后缀', 'No suffixes configured')}</Empty> : <QueryState error={query.error} retry={() => void query.refetch()} />}
     </Panel>
@@ -236,8 +239,8 @@ function ModerateDomain() {
   const { subdomain: sub, records } = query.data;
   const refresh = () => invalidate('admin-domain', 'admin-domains', 'admin-stats', 'domain', 'activity', 'admin-audit');
   return <div className="stack">
-    <Link className="text-link fit" to="/admin/domains">{tr('域名列表', 'Domain list')}</Link>
-    <PageTitle title={sub.fqdn} subtitle={'@' + sub.ownerName + (sub.expiresAt ? ' · ' + date(sub.expiresAt) : '')} side={<DomainStatus status={sub.status} />} />
+    <Link className="back-link" to="/admin/domains"><ArrowLeft size={16} aria-hidden="true" />{tr('域名列表', 'Domain list')}</Link>
+    <PageTitle title={<DomainName name={sub.fqdn} />} subtitle={<><DomainStatus status={sub.status} /><span>@{sub.ownerName}</span>{sub.expiresAt && <span>{tr('有效期至', 'Expires')} {date(sub.expiresAt)}</span>}</>} />
     <Panel title={tr('域名状态', 'Domain status')}>
       <form className="inline-form" key={sub.status + sub.statusReason} onSubmit={(event) => {
         const fields = formData(event);
@@ -259,15 +262,15 @@ function ModerateDomain() {
       setSync(await api<SyncResult>(path + '/sync', 'POST')); await refresh();
     })}>{tr('同步解析', 'Sync DNS')}</button>}>
       {records.length ? <ul className="rows">{records.map((record) => <li key={record.id} className="list-row">
-        <span className="type-tag mono">{record.type}</span><span className="row-main mono break">{record.host} {recordValue(record)}</span>
-        <small>{record.published ? tr('已发布', 'Published') : tr('未发布', 'Unpublished')}</small>
+        <span className="type-tag mono">{record.type}</span><span className="row-main"><strong className="mono break">{record.host}</strong><span className="mono break">{recordValue(record)}</span></span>
+        <span className={'chip ' + (record.published ? 'status-active' : 'status-idle')}>{record.published ? tr('已发布', 'Published') : tr('未发布', 'Unpublished')}</span>
       </li>)}</ul> : <Empty>{tr('暂无 DNS 记录', 'No DNS records')}</Empty>}
       {sync && <div className="inset stack">
-        <p>{tr('重新发布', 'Republished')} {sync.republished} · {tr('缺失', 'Missing')} {sync.missing} · {tr('外部记录', 'Unmanaged')} {sync.unmanaged.length}</p>
+        <p className="meta"><span>{tr('重新发布', 'Republished')} {sync.republished}</span><span>{tr('缺失', 'Missing')} {sync.missing}</span><span>{tr('外部记录', 'Unmanaged')} {sync.unmanaged.length}</span></p>
         {sync.unmanaged.map((record, index) => <code className="break" key={index}>{record.type} {record.name} {record.content}</code>)}
       </div>}
     </Panel>
-    <Panel title={tr('移除域名', 'Remove domain')}><div><ConfirmAction label={tr('移除域名', 'Remove domain')} expected={sub.fqdn} onConfirm={async () => {
+    <Panel title={tr('移除域名', 'Remove domain')} className="danger-zone"><div><ConfirmAction label={tr('移除域名', 'Remove domain')} expected={sub.fqdn} onConfirm={async () => {
       await api(path, 'DELETE', { confirm: sub.fqdn }); setRemoved(true); await refresh(); await invalidate('config');
     }} /></div></Panel>
   </div>;
@@ -287,8 +290,9 @@ function UserRow({ row }: { row: AdminUser }) {
   const [edit, setEdit] = useState(false);
   return <li>
     <div className="list-row">
-      <span className="row-main"><strong>@{row.username} {row.displayName}</strong><small>{row.subdomainCount} {tr('个域名', 'domains')} · {row.passkeyCount} Passkey</small></span>
-      <small>{row.role === 'admin' ? tr('管理员', 'Administrator') : tr('用户', 'User')} · {row.status === 'banned' ? tr('已停用', 'Banned') : tr('正常', 'Active')}</small>
+      <span className="row-main"><strong>@{row.username} <span className="muted">{row.displayName}</span></strong><small className="meta"><span>{row.subdomainCount} {tr('个域名', 'domains')}</span><span>{row.passkeyCount} Passkey</span></small></span>
+      {row.role === 'admin' && <span className="chip status-info">{tr('管理员', 'Administrator')}</span>}
+      {row.status === 'banned' && <span className="chip status-suspended">{tr('已停用', 'Banned')}</span>}
       <button className="button minor" aria-expanded={edit} onClick={() => setEdit(!edit)}>{edit ? tr('收起', 'Collapse') : tr('编辑', 'Edit')}</button>
     </div>
     {edit && <form className="stack inset" onSubmit={(event) => {
@@ -302,7 +306,7 @@ function UserRow({ row }: { row: AdminUser }) {
         await invalidate('admin-users', 'admin-stats', 'admin-audit', 'me'); setEdit(false);
       });
     }}>
-      <small>{tr('注册时间', 'Created')} {date(row.createdAt)} · {tr('最近登录', 'Last signed in')} {date(row.lastLoginAt)} {row.contact && ' · ' + row.contact}</small>
+      <small className="meta"><span>{tr('注册时间', 'Created')} {date(row.createdAt)}</span><span>{tr('最近登录', 'Last signed in')} {date(row.lastLoginAt)}</span>{row.contact && <span>{row.contact}</span>}</small>
       <div className="form-grid">
         <Field label={tr('角色', 'Role')}><select name="role" defaultValue={row.role} disabled={row.id === me.data?.id}>
           <option value="user">{tr('用户', 'User')}</option><option value="admin">{tr('管理员', 'Administrator')}</option>
@@ -341,8 +345,8 @@ function ReportRow({ row }: { row: AdminReport }) {
   const [edit, setEdit] = useState(false);
   return <li>
     <div className="list-row">
-      <div className="row-main"><strong><DomainName name={row.fqdn} /></strong><small>{categoryName(row.category)} · {date(row.createdAt)}</small></div>
-      <small>{statuses.find(([status]) => status === row.status)?.[1]}</small>
+      <div className="row-main"><strong><DomainName name={row.fqdn} /></strong><small className="meta"><span>{categoryName(row.category)}</span><span>{date(row.createdAt)}</span></small></div>
+      <span className={'chip ' + (row.status === 'open' ? 'status-pending' : 'status-idle')}>{statuses.find(([status]) => status === row.status)?.[1]}</span>
       <button className="button minor" aria-expanded={edit} onClick={() => setEdit(!edit)}>{edit ? tr('收起', 'Collapse') : tr('查看举报', 'View report')}</button>
     </div>
     {edit && <form className="stack inset" onSubmit={(event) => {
@@ -354,7 +358,7 @@ function ReportRow({ row }: { row: AdminReport }) {
     }}>
       <p className="break multiline">{row.details}</p>
       {row.contact && <small>{tr('联系方式', 'Contact')} {row.contact}</small>}
-      {row.handlerName && <small>{tr('处理人', 'Handled by')} {row.handlerName} · {date(row.handledAt)}</small>}
+      {row.handlerName && <small className="meta"><span>{tr('处理人', 'Handled by')} {row.handlerName}</span><span>{date(row.handledAt)}</span></small>}
       {row.subdomainId && row.subdomainStatus && <Link className="text-link fit" to={'/admin/domains/' + row.subdomainId}>{tr('管理此域名', 'Manage this domain')}</Link>}
       <div className="form-grid">
         <Field label={tr('处理状态', 'Status')}><select name="status" defaultValue={row.status}>
@@ -452,7 +456,7 @@ function Audit() {
   return <PagedList<ActivityItem> title={tr('审计记录', 'Audit log')} path="/admin/audit" cache="admin-audit"
     filters={<Filters placeholder={tr('操作 对象或账户', 'Action, target or account')} />}
     render={(items) => items.length ? <ul className="rows">{items.map((item) => <li className="list-row" key={item.id}>
-      <div className="row-main"><strong>{activityName(item.action)} {item.targetLabel}</strong><small>{item.actorName ?? tr('系统', 'System')} {item.ip && ' · ' + item.ip}</small></div>
+      <div className="row-main"><strong>{activityName(item.action)} <span className="mono muted">{item.targetLabel}</span></strong><small className="meta"><span>{item.actorName ?? tr('系统', 'System')}</span>{item.ip && <span className="mono">{item.ip}</span>}</small></div>
       <small>{date(item.createdAt)}</small>
     </li>)}</ul> : <Empty>{tr('暂无审计记录', 'No audit events found')}</Empty>} />;
 }

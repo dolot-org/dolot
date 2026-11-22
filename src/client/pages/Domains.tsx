@@ -1,4 +1,4 @@
-import { Clipboard, Download, Globe2, Plus, Search } from 'lucide-react';
+import { ArrowLeft, CalendarClock, Clipboard, Download, Globe2, Info, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { RECORD_TYPES, recordValue, zoneLine, type RecordInput } from '../../shared/dns';
@@ -7,41 +7,38 @@ import { ClaimBox } from '../components/ClaimBox';
 import { DomainName, DomainStatus } from '../components/DomainName';
 import { RecordEditor } from '../components/RecordEditor';
 import { SuffixList } from '../components/SuffixList';
-import { ActionFeedback, ConfirmAction, Empty, Field, formData, PageTitle, Panel, QueryState, textValue, useAction } from '../components/ui';
-import { api, invalidate, useApiQuery } from '../lib/api';
+import { ActionFeedback, ConfirmAction, Empty, Field, formData, Meter, PageTitle, Panel, QueryState, textValue, useAction } from '../components/ui';
+import { api, invalidate, useApiQuery, useConfig } from '../lib/api';
 import { useLocale } from '../lib/preferences';
 
+const DAY = 86_400_000;
+
+function daysLeft(time: number | null) {
+  return time === null ? null : Math.max(0, Math.ceil((time - Date.now()) / DAY));
+}
+
 export function Home({ me }: { me: Me }) {
-  const { tr, date } = useLocale();
+  const { tr } = useLocale();
+  const config = useConfig();
   const domains = useApiQuery<Subdomain[]>('/domains', ['domains']);
   const canClaim = me.quota === null || me.used < me.quota;
-  const claimLink = <Link className="button primary fit" to="/claim"><Plus size={18} aria-hidden="true" />{tr('注册域名', 'Claim a domain')}</Link>;
+  const roots = config.data?.roots ?? [];
+  const claimLink = <Link className="button primary" to="/claim"><Plus size={18} aria-hidden="true" />{tr('注册域名', 'Claim a domain')}</Link>;
   return <div className="stack">
-    <PageTitle title={tr('我的域名', 'My domains')} side={canClaim && domains.data?.length ? claimLink : undefined} />
-    <Panel title={tr('已分配域名', 'Assigned domains')} side={me.quota !== null &&
-      <div className="quota"><span>{tr('账户配额', 'Account quota')}</span><strong className="mono">{me.used} / {me.quota}</strong></div>
-    }>
-      {!domains.data ? <QueryState error={domains.error} retry={() => void domains.refetch()} /> : domains.data.length ? <ul className="domain-cards">
-        {domains.data.map((domain) => <li key={domain.id}>
-          <Link className="domain-card" to={'/domain/' + domain.id}>
-            <div className="domain-card-heading">
-              <span className="domain-icon" aria-hidden="true"><Globe2 size={21} /></span>
-              <div className="row-main"><strong><DomainName name={domain.fqdn} /></strong>{domain.note && <small>{domain.note}</small>}</div>
-              <DomainStatus status={domain.status} />
-            </div>
-            <dl className="domain-card-data">
-              <div><dt>{tr('DNS 记录', 'DNS records')}</dt><dd className="mono">{domain.recordCount}</dd></div>
-              <div><dt>{tr('有效期', 'Valid until')}</dt><dd>{domain.expiresAt ? date(domain.expiresAt) : domain.status === 'pending' ? tr('审核通过后开始', 'After approval') : tr('长期有效', 'No expiration')}</dd></div>
-            </dl>
-            <span className="text-link">{tr('管理域名', 'Manage domain')}</span>
-          </Link>
-        </li>)}
-      </ul> : <div className="domain-empty">
-        <span className="domain-icon" aria-hidden="true"><Globe2 size={23} /></span>
-        <span>{tr('你还没有域名', 'You have no domains yet')}</span>
-        {canClaim && claimLink}
-      </div>}
-    </Panel>
+    <PageTitle title={tr('我的域名', 'My domains')} side={<div className="actions">
+      {me.quota !== null && <span className="quota"><span>{tr('账户配额', 'Account quota')}</span><strong className="mono">{me.used} / {me.quota}</strong></span>}
+      {canClaim && domains.data?.length ? claimLink : null}
+    </div>} />
+    {!domains.data ? <QueryState error={domains.error} retry={() => void domains.refetch()} /> : domains.data.length ? <ul className="plates">
+      {domains.data.map((domain) => <li key={domain.id}><DomainPlate domain={domain} root={roots.find((root) => root.id === domain.rootId)} /></li>)}
+    </ul> : canClaim && roots.length ? <Panel title={tr('注册你的第一个域名', 'Claim your first domain')} className="first-claim">
+      <p className="muted">{tr('输入想要的名称 查询可用后即可注册', 'Enter the name you want and claim it once it is available')}</p>
+      <ClaimBox roots={roots} canClaim />
+    </Panel> : <div className="domain-empty">
+      <span className="domain-icon" aria-hidden="true"><Globe2 size={22} /></span>
+      <span>{tr('你还没有域名', 'You have no domains yet')}</span>
+      {canClaim && claimLink}
+    </div>}
     <div className="workspace-tools">
       <TransferIn canReceive={canClaim} />
       <ResolveBox />
@@ -49,11 +46,32 @@ export function Home({ me }: { me: Me }) {
   </div>;
 }
 
+function DomainPlate({ domain, root }: { domain: Subdomain; root?: RootDomain }) {
+  const { tr, day } = useLocale();
+  const left = daysLeft(domain.expiresAt);
+  return <Link className="plate" to={'/domain/' + domain.id}>
+    <div className="plate-top">
+      <DomainStatus status={domain.status} />
+      {domain.note && <span className="plate-note">{domain.note}</span>}
+    </div>
+    <strong className="plate-name"><DomainName name={domain.fqdn} /></strong>
+    <dl className="plate-facts">
+      <div><dt>{tr('DNS 记录', 'DNS records')}</dt><dd>{domain.recordCount}{root && <small> / {root.maxRecords}</small>}</dd></div>
+      <div><dt>{left === null ? tr('有效期', 'Term') : tr('剩余', 'Remaining')}</dt>
+        <dd>{left !== null ? left + tr(' 天', left === 1 ? ' day' : ' days') : domain.status === 'pending' ? tr('审核通过后开始', 'After approval') : tr('长期有效', 'No expiration')}</dd></div>
+      {domain.expiresAt !== null && <div><dt>{tr('到期日', 'Expires')}</dt><dd>{day(domain.expiresAt)}</dd></div>}
+    </dl>
+    {left !== null && root && root.termDays > 0 && <Meter value={left / root.termDays} label={tr('剩余有效期', 'Remaining term')} />}
+    <span className="plate-cta">{tr('管理域名', 'Manage domain')}</span>
+  </Link>;
+}
+
 export function Claim({ roots }: { roots: RootDomain[] }) {
   const { tr } = useLocale();
   const [search] = useSearchParams();
   return <div className="stack">
-    <PageTitle title={tr('注册域名', 'Claim a domain')} />
+    <Link to="/home" className="back-link"><ArrowLeft size={16} aria-hidden="true" />{tr('我的域名', 'My domains')}</Link>
+    <PageTitle title={tr('注册域名', 'Claim a domain')} subtitle={tr('输入想要的名称或粘贴完整域名', 'Enter a name or paste a full domain')} />
     <Panel title={tr('检查名称', 'Check a name')}>
       <ClaimBox key={search.toString()} roots={roots} initialRoot={search.get('rootId') ?? ''} initialLabel={search.get('label') ?? ''} canClaim />
     </Panel>
@@ -84,7 +102,11 @@ function TransferIn({ canReceive }: { canReceive: boolean }) {
     </form>
     {preview && <div className="inset stack">
       <strong><DomainName name={preview.fqdn} /></strong>
-      <p>{tr('来自', 'From')} {preview.fromName} · {preview.recordCount} {tr('条记录', 'records')}{preview.expiresAt && ' · ' + date(preview.expiresAt)}</p>
+      <p className="meta">
+        <span>{tr('来自', 'From')} {preview.fromName}</span>
+        <span>{preview.recordCount} {tr('条记录', 'records')}</span>
+        {preview.expiresAt && <span>{tr('有效期至', 'Expires')} {date(preview.expiresAt)}</span>}
+      </p>
       <button className="button primary fit" disabled={action.busy} onClick={() => void action.run(async () => {
         const result = await api<{ id: string }>('/transfers/accept', 'POST', { code });
         await invalidate('domains', 'me');
@@ -111,10 +133,12 @@ function ResolveBox({ name = '' }: { name?: string }) {
       <button className="button secondary" disabled={action.busy}><Search size={17} />{tr('查询', 'Look up')}</button>
     </form>
     {result && (result.answers.length ? <ul className="rows">
-      {result.answers.map((answer, index) => <li className="list-row mono" key={index}>
-        <span className="type-tag">{answer.type}</span><span className="row-main break">{answer.name} {answer.data}</span><small>{answer.ttl}s</small>
+      {result.answers.map((answer, index) => <li className="list-row answer-row" key={index}>
+        <span className="type-tag mono">{answer.type}</span>
+        <span className="row-main"><strong className="mono break">{answer.data}</strong><small className="mono break">{answer.name}</small></span>
+        <small className="mono">{answer.ttl}s</small>
       </li>)}
-    </ul> : <Empty>{tr('未找到记录', 'No records found')} · DNS {result.status}</Empty>)}
+    </ul> : <Empty>{tr('未找到记录', 'No records found')} DNS {result.status}</Empty>)}
     <ActionFeedback action={action} />
   </Panel>;
 }
@@ -125,30 +149,40 @@ export function DomainDetail() {
 }
 
 function DomainDetails({ id }: { id: string }) {
-  const { tr, date } = useLocale();
+  const { tr, day } = useLocale();
   const navigate = useNavigate();
   const base = '/domains/' + id;
   const query = useApiQuery<SubdomainDetail>(base, ['domain', id]);
   if (!query.data) return <QueryState error={query.error} retry={() => void query.refetch()} />;
   const detail = query.data;
   const sub = detail.subdomain;
+  const left = daysLeft(sub.expiresAt);
+  const subtitle = sub.expiresAt === null
+    ? sub.status === 'pending' ? tr('审核通过后开始计算有效期', 'The term starts after approval') : tr('长期有效', 'No expiration')
+    : left ? <>{tr('有效期至', 'Expires')} {day(sub.expiresAt)}<span className="days-left">{tr(`剩余 ${left} 天`, `${left} ${left === 1 ? 'day' : 'days'} left`)}</span></>
+    : tr(`已于 ${day(sub.expiresAt)} 过期`, `Expired ${day(sub.expiresAt)}`);
   return <div className="stack domain-detail">
-    <Link to="/home" className="text-link fit">{tr('我的域名', 'My domains')}</Link>
-    <PageTitle title={sub.fqdn} subtitle={sub.expiresAt ? tr('有效期至', 'Expires') + ' ' + date(sub.expiresAt) : sub.status === 'pending' ? undefined : tr('长期有效', 'No expiration')}
-      side={<DomainStatus status={sub.status} />} />
-    {sub.statusReason && <p className="notice">{sub.statusReason}</p>}
-    <RecordList detail={detail} base={base} />
-    <ResolveBox name={sub.fqdn} />
-    <Lifecycle detail={detail} base={base} />
-    <Activity base={base} id={id} />
-    <Panel title={tr('释放域名', 'Release domain')}>
-      <p className="muted">{tr('释放后会删除全部 DNS 记录 其他人可重新注册', 'Releasing this domain removes all DNS records and makes the name available again')}</p>
-      <div><ConfirmAction label={tr('释放域名', 'Release domain')} expected={sub.fqdn} onConfirm={async () => {
-        await api(base, 'DELETE', { confirm: sub.fqdn });
-        await invalidate('domains', 'me', 'config');
-        navigate('/home');
-      }} /></div>
-    </Panel>
+    <Link to="/home" className="back-link"><ArrowLeft size={16} aria-hidden="true" />{tr('我的域名', 'My domains')}</Link>
+    <PageTitle title={<DomainName name={sub.fqdn} />} subtitle={<><DomainStatus status={sub.status} />{subtitle}</>} />
+    {sub.statusReason && <p className="notice"><Info size={18} aria-hidden="true" />{sub.statusReason}</p>}
+    <div className="detail-grid">
+      <div className="stack">
+        <RecordList detail={detail} base={base} />
+        <ResolveBox name={sub.fqdn} />
+      </div>
+      <aside className="stack" aria-label={tr('域名设置', 'Domain settings')}>
+        <Lifecycle detail={detail} base={base} />
+        <Activity base={base} id={id} />
+        <Panel title={tr('释放域名', 'Release domain')} className="danger-zone">
+          <p className="muted">{tr('释放后会删除全部 DNS 记录 其他人可重新注册', 'Releasing this domain removes all DNS records and makes the name available again')}</p>
+          <div><ConfirmAction label={tr('释放域名', 'Release domain')} expected={sub.fqdn} onConfirm={async () => {
+            await api(base, 'DELETE', { confirm: sub.fqdn });
+            await invalidate('domains', 'me', 'config');
+            navigate('/home');
+          }} /></div>
+        </Panel>
+      </aside>
+    </div>
   </div>;
 }
 
@@ -187,48 +221,59 @@ function RecordList({ detail, base }: { detail: SubdomainDetail; base: string })
   }
 
   return <Panel title={tr('DNS 记录', 'DNS records')} side={<div className="actions">
-    <div className="quota"><span>{tr('记录上限', 'Record limit')}</span><strong className="mono">{detail.records.length} / {detail.root.maxRecords}</strong></div>
+    <span className="quota"><span>{tr('记录', 'Records')}</span><strong className="mono">{detail.records.length} / {detail.root.maxRecords}</strong></span>
     {detail.records.length > 0 && <button className="button secondary" onClick={download}><Download size={17} aria-hidden="true" />{tr('导出', 'Export')}</button>}
-    {canAdd && <button className="button primary" aria-expanded={editor === 'new'} onClick={() => { setEditor('new'); setRemoving(null); }}>
+    {canAdd && <button className="button primary" aria-expanded={editor === 'new'} onClick={() => { setEditor(editor === 'new' ? null : 'new'); setRemoving(null); }}>
       <Plus size={17} aria-hidden="true" />{tr('添加记录', 'Add record')}
     </button>}
   </div>}>
     {canAdd && editor === 'new' && showEditor()}
-    {detail.records.length ? <ul className="rows records-list">
-      {detail.records.map((row) => <li key={row.id}>
-        <div className="list-row record-row">
-          <span className="type-tag mono">{row.type}</span>
-          <div className="row-main">
-            <strong className="mono break">{row.host}</strong>
-            <span className="mono break">{recordValue(row)}</span>
-            {row.comment && <small>{row.comment}</small>}
+    {detail.records.length ? <div className="records">
+      <div className="records-head" aria-hidden="true">
+        <span>{tr('类型', 'Type')}</span><span>{tr('主机', 'Host')}</span><span>{tr('记录值', 'Value')}</span><span>{tr('状态', 'Status')}</span><span />
+      </div>
+      <ul className="rows records-list">
+        {detail.records.map((row) => <li key={row.id}>
+          <div className={'record-row' + (editor === row.id || removing === row.id ? ' is-open' : '')}>
+            <span className="type-tag mono">{row.type}</span>
+            <strong className="record-host mono break">{row.host}</strong>
+            <span className="record-value">
+              <span className="mono break">{recordValue(row)}</span>
+              {row.comment && <small>{row.comment}</small>}
+            </span>
+            <span className="record-meta">
+              <span className={'chip ' + (row.published ? 'status-active' : 'status-idle')}>{row.published ? tr('已发布', 'Published') : tr('未发布', 'Unpublished')}</span>
+              <small>{row.proxied ? tr('已代理', 'Proxied') : 'TTL ' + (row.ttl === 1 ? tr('自动', 'Auto') : row.ttl)}</small>
+            </span>
+            {editable && <span className="record-actions">
+              <button className="icon-button" type="button" title={tr('编辑', 'Edit')} aria-label={tr('编辑', 'Edit') + ' ' + row.type + ' ' + row.host}
+                aria-expanded={editor === row.id} onClick={() => { setEditor(editor === row.id ? null : row.id); setRemoving(null); }}><Pencil size={16} aria-hidden="true" /></button>
+              <button className="icon-button danger-icon" type="button" title={tr('删除', 'Delete')} aria-label={tr('删除', 'Delete') + ' ' + row.type + ' ' + row.host}
+                aria-expanded={removing === row.id} onClick={() => { setRemoving(removing === row.id ? null : row.id); setEditor(null); }}><Trash2 size={16} aria-hidden="true" /></button>
+            </span>}
           </div>
-          <div className="record-meta">
-            <span className={'domain-status ' + (row.published ? 'status-active' : '')}>{row.published ? tr('已发布', 'Published') : tr('未发布', 'Unpublished')}</span>
-            <small>{row.proxied ? tr('已代理', 'Proxied') : 'TTL ' + (row.ttl === 1 ? tr('自动', 'Auto') : row.ttl)}</small>
-          </div>
-          {editable && <div className="actions record-actions">
-            <button className="button minor" aria-expanded={editor === row.id} onClick={() => { setEditor(row.id); setRemoving(null); }}>{tr('编辑', 'Edit')}</button>
-            <button className="button minor danger" aria-expanded={removing === row.id} onClick={() => { setRemoving(row.id); setEditor(null); }}>{tr('删除', 'Delete')}</button>
+          {editable && editor === row.id && showEditor(row)}
+          {editable && removing === row.id && <div className="record-inline" ref={inlinePanel} tabIndex={-1}>
+            <RecordRemoval cancel={() => setRemoving(null)} remove={async () => {
+              await api(base + '/records/' + row.id, 'DELETE');
+              setRemoving(null);
+              await invalidate('domain', 'domains', 'activity');
+            }} />
           </div>}
-        </div>
-        {editable && editor === row.id && showEditor(row)}
-        {editable && removing === row.id && <div className="record-inline" ref={inlinePanel} tabIndex={-1}>
-          <RecordRemoval cancel={() => setRemoving(null)} remove={async () => {
-            await api(base + '/records/' + row.id, 'DELETE');
-            setRemoving(null);
-            await invalidate('domain', 'domains', 'activity');
-          }} />
-        </div>}
-      </li>)}
-    </ul> : editor !== 'new' && <Empty>{tr('还没有 DNS 记录', 'No DNS records yet')}</Empty>}
+        </li>)}
+      </ul>
+    </div> : editor !== 'new' && <div className="domain-empty">
+      <span className="domain-icon" aria-hidden="true"><Plus size={22} /></span>
+      <span>{tr('还没有 DNS 记录', 'No DNS records yet')}</span>
+      {canAdd && <small>{tr('添加一条 A 或 CNAME 记录 让域名指向你的服务', 'Add an A or CNAME record to point the domain at your service')}</small>}
+    </div>}
   </Panel>;
 }
 
 function RecordRemoval({ cancel, remove }: { cancel: () => void; remove: () => Promise<void> }) {
   const { tr } = useLocale();
   const action = useAction();
-  return <div className="inset stack">
+  return <div className="inset stack confirm-box">
     <p>{tr('确认删除这条 DNS 记录', 'Delete this DNS record')}</p>
     <div className="actions">
       <button className="button danger" disabled={action.busy} onClick={() => void action.run(remove)}>{tr('确认删除', 'Delete record')}</button>
@@ -252,15 +297,15 @@ function Lifecycle({ detail, base }: { detail: SubdomainDetail; base: string }) 
       <Field label={tr('备注', 'Note')}><input name="note" maxLength={200} defaultValue={sub.note} /></Field>
       <button className="button secondary" disabled={action.busy}>{tr('保存备注', 'Save note')}</button>
     </form>
-    {detail.renewable && <div><button className="button secondary" disabled={action.busy} onClick={() => void action.run(async () => {
+    {detail.renewable && <div><button className="button primary" disabled={action.busy} onClick={() => void action.run(async () => {
       const result = await api<{ failed: number }>(base + '/renew', 'POST');
       await invalidate('domain', 'domains', 'activity');
       if (result.failed) throw new Error(tr('已续期 部分记录尚未发布', 'Renewed with some DNS records still unpublished'));
     }, tr('域名已续期', 'Domain renewed'))}>{tr('续期', 'Renew domain')}</button></div>}
-    {!detail.renewable && detail.renewOpensAt && sub.status === 'active' && <small>{tr('可续期时间', 'Renewal opens')} {date(detail.renewOpensAt)}</small>}
-    {detail.purgeAt && (sub.status === 'expired' || (sub.expiresAt !== null && sub.expiresAt <= Date.now())) && <small>{tr('回收时间', 'Release date')} {date(detail.purgeAt)}</small>}
+    {!detail.renewable && detail.renewOpensAt && sub.status === 'active' && <p className="fact"><CalendarClock size={17} aria-hidden="true" /><span>{tr('可续期时间', 'Renewal opens')}<strong>{date(detail.renewOpensAt)}</strong></span></p>}
+    {detail.purgeAt && (sub.status === 'expired' || (sub.expiresAt !== null && sub.expiresAt <= Date.now())) && <p className="fact danger-text"><CalendarClock size={17} aria-hidden="true" /><span>{tr('回收时间', 'Release date')}<strong>{date(detail.purgeAt)}</strong></span></p>}
     {transferAllowed && <div className="inset stack">
-      <h3>{tr('转移域名', 'Transfer domain')}</h3>
+      <div><h3>{tr('转移域名', 'Transfer domain')}</h3><small>{tr('把转移码交给对方 对方在我的域名页接收', 'Share the code The recipient accepts it from their domains page')}</small></div>
       {ticket && ticket.expiresAt > Date.now() && <div className="actions"><code className="transfer-code">{ticket.code}</code>
         <button className="button secondary" onClick={() => void action.run(() => navigator.clipboard.writeText(ticket.code), tr('已复制', 'Copied'))}><Clipboard size={16} />{tr('复制转移码', 'Copy code')}</button>
       </div>}
@@ -305,11 +350,11 @@ function Activity({ base, id }: { base: string; id: string }) {
   const activityName = useActivityName();
   const query = useApiQuery<ActivityItem[]>(base + '/activity', ['activity', id]);
   return <Panel title={tr('域名动态', 'Domain activity')}>
-    {query.data ? query.data.length ? <ul className="rows">
-      {query.data.map((row) => <li className="list-row" key={row.id}>
-        <span className="row-main"><strong>{activityName(row.action)}</strong><small>{row.actorName || (row.byAdmin ? tr('管理员', 'Administrator') : tr('系统', 'System'))}</small></span>
-        <small>{date(row.createdAt)}</small>
+    {query.data ? query.data.length ? <ol className="timeline">
+      {query.data.map((row) => <li key={row.id}>
+        <strong>{activityName(row.action)}</strong>
+        <small>{row.actorName || (row.byAdmin ? tr('管理员', 'Administrator') : tr('系统', 'System'))} <time dateTime={new Date(row.createdAt).toISOString()}>{date(row.createdAt)}</time></small>
       </li>)}
-    </ul> : <Empty>{tr('暂无动态', 'No activity yet')}</Empty> : <QueryState error={query.error} retry={() => void query.refetch()} />}
+    </ol> : <Empty>{tr('暂无动态', 'No activity yet')}</Empty> : <QueryState error={query.error} retry={() => void query.refetch()} />}
   </Panel>;
 }

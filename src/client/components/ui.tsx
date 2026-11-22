@@ -37,18 +37,25 @@ export function ErrorNotice({ message }: { message: string }) {
 export function QueryState({ error, retry }: { error?: Error | null; retry?: () => void }) {
   const { tr } = useLocale();
   if (error) return <div className="stack"><ErrorNotice message={error.message} />{retry && <button className="button secondary" onClick={retry}>{tr('重试', 'Retry')}</button>}</div>;
-  return <p className="loading" role="status"><LoaderCircle size={19} className="spin" />{tr('正在加载', 'Loading')}</p>;
+  return <p className="loading" role="status"><LoaderCircle size={18} className="spin" aria-hidden="true" />{tr('正在加载', 'Loading')}</p>;
 }
 
-export function Panel({ title, children, side }: { title: string; children: ReactNode; side?: ReactNode }) {
-  return <section className="panel stack">
+export function Panel({ title, children, side, className = '' }: { title: string; children: ReactNode; side?: ReactNode; className?: string }) {
+  return <section className={'panel stack ' + className}>
     <div className="section-head"><h2>{title}</h2>{side}</div>
     {children}
   </section>;
 }
 
-export function PageTitle({ title, subtitle, side }: { title: string; subtitle?: string; side?: ReactNode }) {
-  return <header className="page-title"><div><h1>{title}</h1>{subtitle && <p>{subtitle}</p>}</div>{side}</header>;
+export function PageTitle({ title, subtitle, side }: { title: ReactNode; subtitle?: ReactNode; side?: ReactNode }) {
+  return <header className="page-title"><div className="page-title-text"><h1>{title}</h1>{subtitle && <p>{subtitle}</p>}</div>{side}</header>;
+}
+
+export function Meter({ value, label }: { value: number; label: string }) {
+  const clamped = Math.min(1, Math.max(0, value));
+  return <span className="meter" role="meter" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(clamped * 100)}>
+    <span style={{ inlineSize: clamped * 100 + '%' }} />
+  </span>;
 }
 
 export function Field({ label, children, hint }: { label: string; children: ReactNode; hint?: string }) {
@@ -80,7 +87,7 @@ export function ConfirmAction({ label, expected, onConfirm }: { label: string; e
     void action.run(async () => { await onConfirm(); setOpen(false); setConfirm(''); });
   }}>
     <Field label={tr('输入以下名称以确认', 'Enter this name to confirm')} hint={expected}>
-      <input value={confirm} onChange={(event) => setConfirm(event.target.value)} required autoComplete="off" />
+      <input className="mono" value={confirm} onChange={(event) => setConfirm(event.target.value)} required autoComplete="off" />
     </Field>
     <div className="actions">
       <button className="button danger" disabled={action.busy || confirm !== expected}>{label}</button>
