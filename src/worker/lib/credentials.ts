@@ -33,7 +33,7 @@ export function transportsOf(row: CredentialRow) {
 export async function registrationOptions(c: Ctx, kind: 'register' | 'add-passkey', user: { id: string; username: string; displayName: string }, existing: CredentialRow[] = []) {
   const rp = rpInfo(c);
   const options = await generateRegistrationOptions({
-    rpID: rp.rpID, rpName: rp.rpName, userID: new TextEncoder().encode(user.id),
+    rpID: rp.rpID, rpName: rp.rpName, userID: new Uint8Array(new TextEncoder().encode(user.id)),
     userName: user.username, userDisplayName: user.displayName || user.username,
     attestationType: 'none',
     authenticatorSelection: { residentKey: 'required', userVerification: 'required' },
