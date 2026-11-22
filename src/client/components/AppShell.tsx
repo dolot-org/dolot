@@ -1,4 +1,4 @@
-import { Globe2, Moon, Shield, Sun, UserRound } from 'lucide-react';
+import { Globe2, Mail, Moon, Shield, Sun, UserRound } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigationType } from 'react-router';
 import type { Me } from '../../shared/types';
@@ -16,6 +16,7 @@ function NavLinks({ me }: { me: Me }) {
   return <>
     <Link to="/home" className={domainSection ? 'active' : undefined}
       aria-current={pathname === '/home' ? 'page' : domainSection ? 'location' : undefined}><Globe2 size={18} aria-hidden="true" /><span>{tr('域名', 'Domains')}</span></Link>
+    <NavLink to="/mail"><Mail size={18} aria-hidden="true" /><span>{tr('邮箱', 'Mail')}</span></NavLink>
     <NavLink to="/account"><UserRound size={18} aria-hidden="true" /><span>{tr('账户', 'Account')}</span></NavLink>
     {me.role === 'admin' && <NavLink to="/admin"><Shield size={18} aria-hidden="true" /><span>{tr('管理', 'Admin')}</span></NavLink>}
   </>;

@@ -26,5 +26,9 @@
     "REQUIRE_PWA": "true",
     "ADMIN_USERNAMES": ""
   },
+  // Enable the inbox by creating a private bucket and enabling Email Routing
+  // "r2_buckets": [{ "binding": "MAIL_FILES", "bucket_name": "dotlo-mail" }],
+  // Enable this binding after onboarding a domain for outbound Email Sending
+  // "send_email": [{ "name": "MAIL_SENDER" }],
   "observability": { "enabled": true }
 }

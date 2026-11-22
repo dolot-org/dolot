@@ -16,7 +16,7 @@
 [![pnpm][badge-pnpm]][pnpm]
 [![Rust and MCP][badge-mcp]](#dotlo-mcp)
 
-Dotlo is a free, open-source subdomain registration and DNS management PWA. Sign in with a passkey to claim a name, manage DNS records, renew it, or transfer it to another account. The admin console manages available suffixes, registration reviews, and abuse reports.
+Dotlo is a free, open-source subdomain registration and DNS management PWA. Sign in with a passkey to claim a name, manage DNS records, renew it, or transfer it to another account. You can also claim an email address and manage messages in the built-in inbox. The admin console manages available suffixes, registration reviews, and abuse reports.
 
 ## Architecture
 
@@ -56,6 +56,7 @@ The example configuration uses `CF_MOCK=true` for simulated DNS and allows brows
 | `POST /api/reports` | Submit an abuse report |
 | `/api/auth` | Register with a passkey, sign in, and sign out |
 | `/api/account`, `/api/domains`, and `/api/transfers` | Manage accounts, domains, and transfers |
+| `/api/mail` | Claim a mailbox, read and organize messages, manage drafts, and send email |
 | `/api/admin` | Manage suffixes, domains, accounts, reports, reserved names, and settings as an administrator |
 
 Browser sign-in creates a cookie session. Write requests require `X-Dotlo-Client: web` and an allowed origin. When the PWA requirement is enabled, restricted routes also require `X-Dotlo-Display: standalone`. See the [route implementations](src/worker/routes/).
@@ -119,6 +120,20 @@ The [Build workflow](.github/workflows/build.yml) runs for pushes to `main`, pul
 | `CF_API_TOKEN` | Add as a Worker secret with Zone Read and DNS Edit permissions scoped to the zones Dotlo manages. Use `CF_MOCK=true` for local simulation. |
 | `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET` | Configure both to enable human verification for registrations and reports. Store the secret as a Worker secret. |
 | `REQUIRE_PWA` | Enabled by default. Set to `false` to make restricted features available in a regular browser window. |
+
+### Built-in Mail
+
+Users can claim one email address per account. If a DNS suffix also accepts mail, one action claims matching names such as `kai.example.org` and `kai@example.org`. A mailbox can also be claimed from **Mail** on its own. Mailbox ownership is independent of DNS renewal, expiry, and transfer.
+
+To enable mail in a self-hosted deployment:
+
+1. Apply `0005_mail.sql` and deploy the Worker with a private R2 bucket bound as `MAIL_FILES`. See the binding example in `wrangler.jsonc`.
+2. In Cloudflare Email Routing, direct the catch-all for each dedicated apex domain to the Dotlo Worker. Keep any existing explicit routing rules and reserve their local parts in Dotlo Admin before opening claims. Add the enabled apex domains to the Worker's comma-separated `MAIL_DOMAINS` variable. [Email routing rules](https://developers.cloudflare.com/email-service/configuration/email-routing-addresses/)
+3. For outbound mail, onboard the sending domains in Cloudflare Email Service, bind `MAIL_SENDER`, and set `MAIL_SEND_DOMAINS` to the onboarded subset. Sending to arbitrary external recipients requires Workers Paid. [Email Service setup](https://developers.cloudflare.com/email-service/get-started/send-emails/)
+
+Each mailbox holds up to 1,000 messages and 100 MiB. Incoming messages can be up to 12 MiB. Outgoing messages support up to 10 attachments totaling 4 MiB and 20 recipients. Trash expires after 30 days. Released addresses are retired permanently, and their messages and attachments are deleted.
+
+For local development, enable the R2 and mail binding examples, add the domain variables in `.dev.vars`, and use Wrangler's local email endpoint to inject a test message. The default local sending binding simulates delivery. [Local receiving](https://developers.cloudflare.com/email-service/observability/local-development/routing/) · [Local sending](https://developers.cloudflare.com/email-service/observability/local-development/sending/)
 
 ## Friends and Acknowledgments
 

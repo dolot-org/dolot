@@ -46,8 +46,8 @@ export function groupCode(code: string): string {
   return code.match(/.{1,4}/g)?.join('-') ?? code;
 }
 
-export async function sha256Hex(value: string): Promise<string> {
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+export async function sha256Hex(value: string | ArrayBuffer): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', typeof value === 'string' ? new TextEncoder().encode(value) : value);
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 

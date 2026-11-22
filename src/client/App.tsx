@@ -9,6 +9,7 @@ import { Account } from './pages/Account';
 import { Admin } from './pages/Admin';
 import { Directory, DirectoryDomainPage } from './pages/Directory';
 import { Claim, DomainDetail, Home } from './pages/Domains';
+import { Inbox } from './pages/Inbox';
 import { About, Agreement, Terms } from './pages/Legal';
 import { InstallGate, NotFound, Report, SignIn, SignUp, Welcome } from './pages/Public';
 
@@ -60,6 +61,7 @@ export function App() {
       <Route path="home" element={signedIn(me && <Home me={me} />)} />
       <Route path="claim" element={signedIn(<Claim roots={config.roots} />)} />
       <Route path="domain/:id" element={signedIn(<DomainDetail />)} />
+      <Route path="mail" element={signedIn(<Inbox />)} />
       <Route path="account" element={signedIn(me && <Account me={me} />)} />
       <Route path="admin/*" element={signedIn(<Admin />, 'admin')} />
       <Route path="report" element={<Report config={config} />} />

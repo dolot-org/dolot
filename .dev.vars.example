@@ -7,3 +7,5 @@ ORIGINS=http://localhost:5173
 ADMIN_USERNAMES=admin
 # TURNSTILE_SITE_KEY=
 # TURNSTILE_SECRET=
+# MAIL_DOMAINS=example.test
+# MAIL_SEND_DOMAINS=example.test

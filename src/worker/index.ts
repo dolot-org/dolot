@@ -5,6 +5,7 @@ import { formatMessage } from '../shared/messages';
 import { sourceLinks } from '../shared/source';
 import type { AppEnv, Env } from './env';
 import { ApiError, fail } from './lib/http';
+import { purgeMail, receiveMail } from './lib/mail';
 import { maintenance } from './lib/maintenance';
 import { sessionMiddleware } from './lib/session';
 import { rpInfo } from './lib/webauthn';
@@ -12,6 +13,7 @@ import { account } from './routes/account';
 import { admin } from './routes/admin';
 import { auth } from './routes/auth';
 import { domains, transfers } from './routes/domains';
+import { mail } from './routes/mail';
 import { publicRoutes } from './routes/public';
 
 const app = new Hono<AppEnv>().basePath('/api');
@@ -27,12 +29,16 @@ app.use('*', async (c, next) => {
   }
   await next();
 });
-app.use('*', bodyLimit({ maxSize: 64 * 1024, onError: () => fail(413, 'bad_request') }));
+const limitBody = bodyLimit({ maxSize: 64 * 1024, onError: () => fail(413, 'bad_request') });
+const limitDraft = bodyLimit({ maxSize: 6 * 1024 * 1024, onError: () => fail(413, 'mail_files_limit') });
+app.use('*', (c, next) => c.req.method === 'PUT' && /^\/api\/mail\/drafts\/[^/]+$/.test(c.req.path)
+  ? limitDraft(c, next) : limitBody(c, next));
 app.use('*', sessionMiddleware);
 app.route('/', publicRoutes);
 app.route('/auth', auth);
 app.route('/account', account);
 app.route('/domains', domains);
+app.route('/mail', mail);
 app.route('/transfers', transfers);
 app.route('/admin', admin);
 app.notFound(() => fail(404, 'not_found'));
@@ -44,7 +50,9 @@ app.onError((error, c) => {
 
 export default {
   fetch: app.fetch,
+  email: receiveMail,
   scheduled(_event, env, ctx) {
     ctx.waitUntil(maintenance(env));
+    ctx.waitUntil(purgeMail(env));
   },
 } satisfies ExportedHandler<Env>;

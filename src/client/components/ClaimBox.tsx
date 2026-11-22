@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
-import { LoaderCircle, Search } from 'lucide-react';
+import { LoaderCircle, Mail, Search } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
+import type { MailStatus } from '../../shared/mail';
 import { cleanHost } from '../../shared/dns';
 import type { Availability, RootDomain, Subdomain } from '../../shared/types';
 import { api, invalidate } from '../lib/api';
@@ -61,6 +62,12 @@ export function ClaimBox({ roots, initialLabel = '', initialRoot = '', canClaim 
     initialLabel && roots.some((root) => root.id === initialRoot) ? { label: cleanHost(initialLabel), rootId: initialRoot } : null,
   );
   const claim = useAction();
+  const [mailChecked, setMailChecked] = useState('');
+  const mail = useQuery({
+    queryKey: ['mail-status'],
+    queryFn: ({ signal }) => api<MailStatus>('/mail/status', 'GET', undefined, signal),
+    enabled: canClaim,
+  });
   const example = useTypedExample(animate && !focused && !label);
   const root = roots.find((item) => item.id === rootId) ?? roots[0];
   const currentRequest = requested && requested.label === cleanHost(label) && requested.rootId === root?.id ? requested : null;
@@ -72,6 +79,9 @@ export function ClaimBox({ roots, initialLabel = '', initialRoot = '', canClaim 
   });
   const searching = lookup.isFetching;
   const result = lookup.data;
+  const mailAddress = currentRequest && root && !mail.data?.mailbox && mail.data?.domains.includes(root.domain)
+    ? currentRequest.label + '@' + root.domain : '';
+  const claimMail = !!mailAddress && mailChecked === mailAddress;
   if (!root) return <Empty>{tr('暂时没有开放注册的后缀', 'No domain suffixes are open for registration')}</Empty>;
 
   // 粘贴完整域名时拆出名称和后缀
@@ -135,15 +145,21 @@ export function ClaimBox({ roots, initialLabel = '', initialRoot = '', canClaim 
       {result.available && canClaim && <form className="claim-form" onSubmit={(event) => {
         const note = textValue(formData(event), 'note');
         void claim.run(async () => {
-          const value = await api<Subdomain>('/domains', 'POST', { ...currentRequest, note });
-          await invalidate('domains', 'me', 'config');
-          navigate('/domain/' + value.id);
+          const value = await api<Subdomain>('/domains', 'POST', { ...currentRequest, note, mailbox: claimMail });
+          await invalidate('domains', 'me', 'config', 'mail-status');
+          navigate(claimMail ? '/mail' : '/domain/' + value.id);
         });
       }}>
         <Field label={tr('备注', 'Note')} hint={root.requireReview ? tr('此后缀需要管理员审核', 'This suffix requires approval') : undefined}>
           <input name="note" maxLength={200} placeholder={tr('可选', 'Optional')} />
         </Field>
-        <button className="button primary" disabled={claim.busy}>{claim.busy ? tr('正在注册', 'Claiming') : tr('注册域名', 'Claim domain')}</button>
+        {mailAddress && <label className="claim-mail-option">
+          <input type="checkbox" checked={claimMail} disabled={claim.busy} onChange={(event) => setMailChecked(event.target.checked ? mailAddress : '')} />
+          <Mail size={17} aria-hidden="true" />
+          <span>{tr('同时认领邮箱', 'Also claim email')} <strong className="mono break">{mailAddress}</strong></span>
+        </label>}
+        <button className="button primary" disabled={claim.busy}>{claim.busy ? tr('正在注册', 'Claiming') : claimMail
+          ? tr('认领域名和邮箱', 'Claim domain and email') : tr('注册域名', 'Claim domain')}</button>
       </form>}
       <ActionFeedback action={claim} />
     </div>}

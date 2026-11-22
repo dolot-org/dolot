@@ -10,6 +10,7 @@ import { withDomainLock } from '../lib/domain-lock';
 import { checkName, getRoot, getSubJoined, recordRules, renewInfo, rootDto, subDto, SUB_SELECT, userQuota, type RootRow, type SubJoined } from '../lib/domains';
 import { rateLimit } from '../lib/guard';
 import { fail, readBody } from '../lib/http';
+import { checkMailboxClaim, mailboxClaimStmt } from '../lib/mail';
 import { extraData, findConflict, listRecordRows, publishRecords, recordDto, removeSubdomain, rowFields, toPayload } from '../lib/records';
 import { currentUser, pwaGuard, requireUser } from '../lib/session';
 import { DOMAIN_LIMIT_SQL, domainCapacity, getSettings } from '../lib/settings';
@@ -18,6 +19,7 @@ import { canonicalCode, cleanText, clientIp, DAY, groupCode, isUniqueError, now,
 export const domains = new Hono<AppEnv>();
 export const transfers = new Hono<AppEnv>();
 const claimInput = z.object({ rootId: z.string().max(100), label: z.string().trim().toLowerCase().max(100), note: z.string().max(200).default('') });
+const createClaimInput = claimInput.extend({ mailbox: z.boolean().optional() });
 const transferInput = z.object({ code: z.string().max(40) });
 const recordInput = z.object({
   type: z.enum(RECORD_TYPES), host: z.string().max(254), content: z.string().max(2048), ttl: z.number(),
@@ -107,11 +109,12 @@ domains.get('/', async (c) => {
 domains.post('/', async (c) => {
   const user = currentUser(c);
   const { DB } = c.env;
-  const body = await readBody(c, claimInput);
+  const body = await readBody(c, createClaimInput);
   const [root, settings] = await Promise.all([getRoot(DB, body.rootId), getSettings(DB)]);
   if (!root || root.status !== 'active') fail(400, 'root_unavailable');
   const check = await checkName(DB, root, body.label);
   if (check.code) fail(409, check.code, check.params);
+  const address = body.mailbox ? await checkMailboxClaim(c.env, user.id, body.label, root.domain) : null;
   const fqdn = body.label + '.' + root.domain;
   const t = now();
   const id = randomId();
@@ -133,7 +136,9 @@ domains.post('/', async (c) => {
     const claimAudit = DB.prepare(
       "INSERT INTO audit (actor_id, actor_name, action, target_type, target_id, target_label, ip, created_at) SELECT ?, ?, 'subdomain.claim', 'subdomain', id, fqdn, ?, ? FROM subdomains WHERE id = ?",
     ).bind(user.id, user.username, clientIp(c), t, id);
-    const [inserted] = await DB.batch([claim, claimAudit]);
+    const [inserted] = await DB.batch(address
+      ? [claim, mailboxClaimStmt(DB, user.id, address, id), claimAudit]
+      : [claim, claimAudit]);
     if (!inserted.meta.changes) {
       const latest = await userQuota(DB, user, settings);
       if (latest.used >= latest.quota) fail(409, 'quota_reached', { quota: latest.quota });
@@ -145,7 +150,10 @@ domains.post('/', async (c) => {
       fail(429, 'claim_limit');
     }
   } catch (e) {
-    if (isUniqueError(e)) fail(409, 'label_taken');
+    if (isUniqueError(e)) {
+      if (address) await checkMailboxClaim(c.env, user.id, body.label, root.domain);
+      fail(409, 'label_taken');
+    }
     throw e;
   }
   const sub = await getSubJoined(DB, id);

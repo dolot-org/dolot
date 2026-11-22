@@ -10,7 +10,7 @@ export class ApiError extends Error {
   }
 }
 
-export async function api<T = unknown>(path: string, method = 'GET', body?: unknown, signal?: AbortSignal): Promise<T> {
+async function apiRequest(path: string, method = 'GET', body?: unknown, signal?: AbortSignal) {
   const { lang } = getPreferences();
   let response: Response;
   try {
@@ -21,14 +21,21 @@ export async function api<T = unknown>(path: string, method = 'GET', body?: unkn
     if (signal?.aborted) throw error;
     throw new Error(lang === 'zh' ? '无法连接到 Dotlo 请检查网络后重试' : 'Could not reach Dotlo Check your connection and try again');
   }
-  const data = await response.json().catch(() => null) as T | { code?: string; message?: string } | null;
   if (!response.ok) {
-    const error = data as { code?: string; message?: string } | null;
+    const error = await response.json().catch(() => null) as { code?: string; message?: string } | null;
     const code = error?.code && Object.hasOwn(MESSAGES, error.code) ? error.code as MessageCode : 'internal';
     if (response.status === 401) setMe(null);
     throw new ApiError(response.status, code, error?.message || formatMessage(code, lang));
   }
-  return data as T;
+  return response;
+}
+
+export async function api<T = unknown>(path: string, method = 'GET', body?: unknown, signal?: AbortSignal): Promise<T> {
+  return (await apiRequest(path, method, body, signal)).json().catch(() => null) as Promise<T>;
+}
+
+export async function apiBlob(path: string) {
+  return (await apiRequest(path)).blob();
 }
 
 export const queryClient = new QueryClient({

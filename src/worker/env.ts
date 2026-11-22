@@ -1,3 +1,4 @@
+import type { MailSender } from './lib/mail';
 import type { Context } from 'hono';
 import type { Lang } from '../shared/messages';
 import type { Role, UserStatus } from '../shared/types';
@@ -5,6 +6,10 @@ import type { Role, UserStatus } from '../shared/types';
 export interface Env {
   DB: D1Database;
   ASSETS: Fetcher;
+  MAIL_FILES?: R2Bucket;
+  MAIL_DOMAINS?: string;
+  MAIL_SEND_DOMAINS?: string;
+  MAIL_SENDER?: MailSender;
   SOURCE_REPOSITORY?: string;
   SOURCE_REVISION?: string;
   /** Cloudflare API 令牌 需要 Zone Read 与 DNS Edit 权限 */
