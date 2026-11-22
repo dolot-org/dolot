@@ -1,22 +1,40 @@
 # Dotlo
 
-Dotlo 是一个提供免费二级域名注册和 DNS 管理的 PWA。用户通过 Passkey 登录，可管理解析记录、续期或转移域名。管理后台负责后缀配置、注册审核和滥用举报。
+[![Open the Dotlo app][badge-app]][app]
+[![AGPL version 3 license][badge-license]](LICENSE)
+[![GitHub Actions build status][badge-build]](.github/workflows/build.yml)
+[![GitHub releases][badge-releases]][releases]
 
-## 架构与目录
+[![Cloudflare Workers][badge-workers]][workers]
+[![Cloudflare D1][badge-d1]][d1]
+[![Cloudflare DNS][badge-dns]][dns]
+[![Passkey authentication][badge-passkeys]](#local-development)
 
-React 前端由 Vite 构建。Cloudflare Workers 提供静态资源，并将 `/api/*` 交给 Hono 处理。D1 保存账户、域名、DNS 记录和审计数据。Worker 调用 Cloudflare DNS 发布解析，并每小时处理域名到期和回收。
+[![React][badge-react]][react]
+[![TypeScript][badge-typescript]][typescript]
+[![Vite][badge-vite]][vite]
+[![pnpm][badge-pnpm]][pnpm]
+[![Rust and MCP][badge-mcp]](#dotlo-mcp)
 
-| 路径 | 职责 |
+Dotlo is a free, open-source subdomain registration and DNS management PWA. Sign in with a passkey to claim a name, manage DNS records, renew it, or transfer it to another account. The admin console manages available suffixes, registration reviews, and abuse reports.
+
+## Architecture
+
+Vite builds the React frontend. Cloudflare Workers serves the PWA and routes `/api/*` to Hono. D1 stores accounts, registrations, DNS records, and audit events. The Worker publishes records through Cloudflare DNS and processes expirations and reclamation on an hourly schedule.
+
+| Path | Purpose |
 | --- | --- |
-| `src/client/` | PWA 页面、Passkey 交互和 API 客户端 |
-| `src/worker/` | API 路由、会话、Cloudflare DNS 和定时维护 |
-| `src/shared/` | API 类型、DNS 记录校验和中英文消息 |
-| `migrations/` | 按编号顺序执行的 D1 迁移 |
-| `public/` | PWA 图标和静态资源响应头 |
+| `src/client/` | PWA screens, passkey flows, and API client |
+| `src/worker/` | API routes, sessions, DNS integration, and scheduled maintenance |
+| `src/shared/` | API types, DNS validation, and English and Chinese messages |
+| `migrations/` | Numbered D1 migrations |
+| `mcp/` | Rust MCP server and local client configuration |
+| `scripts/` | MCP installers and PWA icon generation |
+| `public/` | PWA icons and static asset headers |
 
-## 本地开发
+## Local Development
 
-使用 Node.js 22.12 或更新的 LTS 版本，以及 `package.json` 指定的 pnpm。GitHub Actions 使用 Node.js 24。
+Use Node.js 22.12 or newer and the pnpm version pinned in [package.json](package.json). GitHub Actions uses Node.js 24.
 
 ```sh
 pnpm install --frozen-lockfile
@@ -25,39 +43,118 @@ pnpm db:migrate:local
 pnpm dev:api
 ```
 
-另开终端运行 `pnpm dev`，访问 `http://localhost:5173`。Vite 将 `/api` 转发给监听 `8787` 的 Wrangler。Passkey 校验使用配置中的来源，直接把浏览器地址换成 `127.0.0.1` 会导致验证失败。
+In a second terminal, run `pnpm dev` and open `http://localhost:5173`. Vite proxies `/api` to Wrangler on port `8787`. Use the configured `localhost` origin for passkey flows.
 
-示例配置使用 `CF_MOCK=true`，并允许直接在浏览器中登录。用用户名 `admin` 注册 Passkey，在管理后台添加 `example.test` 后缀，区域 ID 填 `mock-zone`。随后即可在本地 D1 中注册域名并管理模拟 DNS 记录。
+The example configuration uses `CF_MOCK=true` for simulated DNS and allows browser sign-in. Register the username `admin`, then add `example.test` in the admin console with `mock-zone` as its zone ID. You can then claim names and edit simulated records against local D1.
 
 ## API
 
-- `GET /api/config` 返回公开配置与可注册后缀。公开查询使用 `/api/domains/check` 和 `/api/domains/resolve`，举报提交到 `POST /api/reports`。
-- `/api/auth` 处理 Passkey 注册、登录和退出。账户、域名管理和转移分别使用 `/api/account`、`/api/domains` 和 `/api/transfers`。
-- `/api/admin` 管理 DNS 后缀、域名、账户、举报、保留名称和站点设置，需要管理员会话。路由实现见 [`src/worker/routes/`](src/worker/routes/)。
-
-登录后使用 Cookie 会话。写请求需要 `X-Dotlo-Client: web` 并通过来源校验。开启 PWA 限制时，受限接口还要求 `X-Dotlo-Display: standalone`。
-
-## 构建
-
-| 命令 | 用途 |
+| Route | Purpose |
 | --- | --- |
-| `pnpm build` | 执行 TypeScript 检查并将 PWA 构建到 `dist/client` |
-| `pnpm check:worker` | 用 Wrangler dry run 将 Worker 打包到 `dist/worker` |
-| `pnpm icons` | 重新生成 `public/` 下的 PWA PNG 图标 |
+| `GET /api/config` | Public settings and available suffixes |
+| `/api/domains/check` and `/api/domains/resolve` | Check name availability and look up DNS records |
+| `POST /api/reports` | Submit an abuse report |
+| `/api/auth` | Register with a passkey, sign in, and sign out |
+| `/api/account`, `/api/domains`, and `/api/transfers` | Manage accounts, domains, and transfers |
+| `/api/admin` | Manage suffixes, domains, accounts, reports, reserved names, and settings as an administrator |
 
-GitHub Actions 的 [Build 工作流](.github/workflows/build.yml) 在推送到 `main`、拉取请求和手动触发时构建。成功后可从运行页面下载包含前端与 Worker 的 `dotlo-build` 产物。
+Browser sign-in creates a cookie session. Write requests require `X-Dotlo-Client: web` and an allowed origin. When the PWA requirement is enabled, restricted routes also require `X-Dotlo-Display: standalone`. See the [route implementations](src/worker/routes/).
 
-## 运行配置
+## Dotlo MCP
 
-- **D1** 在 `wrangler.jsonc` 中为 `DB` 绑定填入实际数据库 ID。远程数据库使用 `pnpm db:migrate:remote` 应用迁移。
-- **Passkey** `ORIGINS` 接受逗号分隔的来源，默认使用请求自身的来源。`RP_ID` 默认取来源的主机名。线上前端与 API 使用同一 HTTPS 来源。
-- **管理员** `ADMIN_USERNAMES` 为匹配的用户名在注册时授予管理员角色。面向公众开放前先创建管理员账户，再清空初始化名单。现有角色通过管理后台维护。
-- **DNS** 通过 Worker 密钥注入 `CF_API_TOKEN`，仅授权需管理的 Cloudflare 区域，并授予 Zone Read 与 DNS Edit 权限。`CF_MOCK=true` 用于本地模拟。
-- **人机验证** 成对配置 `TURNSTILE_SITE_KEY` 与 Worker 密钥 `TURNSTILE_SECRET`，用于注册和举报。
-- **PWA** `REQUIRE_PWA` 默认开启。设为 `false` 可在普通浏览器窗口使用受限功能。
+These instructions apply to checkouts and releases that include Dotlo MCP.
 
-## 许可证
+Dotlo MCP connects AI clients over local standard input and output. It can look up domains and DNS records, claim and renew names, edit DNS, and process transfers within the authorized account.
 
-Dotlo 采用 GNU Affero General Public License 第 3 版（`AGPL-3.0-only`）。完整条款见 [LICENSE](LICENSE)。
+Download the installer for your platform from [GitHub Releases][releases]. It downloads the matching binary, verifies its SHA-256 checksum, and starts setup and sign-in.
 
-自托管时请公开实际部署的源码提交。构建前端时将 `VITE_SOURCE_REPOSITORY` 与 `VITE_SOURCE_REVISION` 分别设为公开的 GitHub 仓库地址和完整提交 SHA，并在 Worker 中设置相同的 `SOURCE_REPOSITORY` 与 `SOURCE_REVISION`。关于页、页脚和 API 响应头会提供对应版本的源码入口。
+**Linux and macOS**
+
+```sh
+bash ./install-mcp.sh --url https://your-dotlo.example
+```
+
+**Windows x64 with PowerShell**
+
+```powershell
+.\install-mcp.ps1 -Url https://your-dotlo.example
+```
+
+Replace the URL with your Dotlo instance. The installer prompts for the URL if you omit it. Enter the pairing code shown in the terminal in your browser and confirm access with your passkey.
+
+The installer detects and configures Codex, Claude Code, Cursor, Claude Desktop, and VS Code when available. Claude Code and VS Code must be available on your command path. Select only Codex with `--agent codex` or `-Agent codex`. Restart the AI client after setup.
+
+With Rust installed, you can build from the checkout using `bash scripts/install-mcp.sh --from-source` or `.\scripts\install-mcp.ps1 -FromSource`.
+
+| Option or command | Use |
+| --- | --- |
+| `--read-only` | Allow domain and DNS lookups only. Reauthorize an existing connection with `dotlo-mcp login --read-only`. |
+| `--no-browser` | Print the authorization URL for pairing from a separate browser. |
+| `dotlo-mcp status` | Check the current connection. |
+| `dotlo-mcp logout` | Revoke access. You can also revoke it from **MCP connections** in your web account. |
+| `DOTLO_MCP_HOME` | Set the credential directory. Use the same absolute path for the terminal and MCP client. |
+
+For manual client setup, point the MCP command at the binary's absolute path with arguments `["serve"]`, then run `dotlo-mcp login --url https://your-dotlo.example`. Connections expire after 30 days.
+
+Self-hosted instances need the `0004_mcp_authorizations.sql` migration and the MCP-enabled Worker and frontend. Use `http://localhost:5173` for local pairing. The `mcp.yml` workflow in MCP-enabled checkouts builds binaries and publishes releases for `mcp-v*` tags.
+
+## Build and Deployment
+
+| Command | Result |
+| --- | --- |
+| `pnpm build` | Type-checks the project and builds the PWA into `dist/client`. |
+| `pnpm check:worker` | Runs a Wrangler dry run and bundles the Worker into `dist/worker`. |
+| `pnpm icons` | Regenerates the PWA PNG icons in `public/`. |
+| `pnpm db:migrate:remote` | Applies pending migrations to the configured remote D1 database. |
+
+The [Build workflow](.github/workflows/build.yml) runs for pushes to `main`, pull requests, and manual runs. Download the Worker and PWA from the successful run's `dotlo-build` artifact. Deploy the artifact separately after applying any pending migrations.
+
+### Runtime Configuration
+
+| Setting | Purpose |
+| --- | --- |
+| `DB` | Set the D1 database ID in `wrangler.jsonc`. |
+| `ORIGINS` and `RP_ID` | Set allowed origins as a comma-separated list and the passkey relying-party ID. They default to the request origin and its hostname. Serve the production frontend and API from the same HTTPS origin. |
+| `ADMIN_USERNAMES` | Grants administrator access to matching usernames at registration. Create the initial administrator accounts before opening public registration, then clear the bootstrap list. Use the admin console to manage existing roles. |
+| `CF_API_TOKEN` | Add as a Worker secret with Zone Read and DNS Edit permissions scoped to the zones Dotlo manages. Use `CF_MOCK=true` for local simulation. |
+| `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET` | Configure both to enable human verification for registrations and reports. Store the secret as a Worker secret. |
+| `REQUIRE_PWA` | Enabled by default. Set to `false` to make restricted features available in a regular browser window. |
+
+## Friends and Acknowledgments
+
+[![Friend link to Cloudflare][badge-cloudflare]][cloudflare]
+
+Cloudflare makes it practical for a small open-source project like Dotlo to operate a free public service. Workers serves the app and API, D1 takes care of the database, and Cloudflare DNS publishes the records our users create. Thanks to the Cloudflare teams for building developer tools that work well together and for supporting open-source maintainers through programs like [Project Alexandria][alexandria].
+
+## License and Corresponding Source
+
+Dotlo is available under the GNU Affero General Public License version 3 only. See the [full license](LICENSE).
+
+Self-hosted deployments should publish the exact source commit they run. Set `VITE_SOURCE_REPOSITORY` and `VITE_SOURCE_REVISION` to the public GitHub repository URL and full commit SHA when building the frontend. Set the same values in the Worker's `SOURCE_REPOSITORY` and `SOURCE_REVISION` variables. The [About page][about], footer, and API response headers provide corresponding-source links.
+
+[app]: https://app.dotlo.org/
+[about]: https://app.dotlo.org/about
+[releases]: https://github.com/dolot-org/dolot/releases
+[workers]: https://developers.cloudflare.com/workers/
+[d1]: https://developers.cloudflare.com/d1/
+[dns]: https://developers.cloudflare.com/dns/
+[react]: https://react.dev/
+[typescript]: https://www.typescriptlang.org/
+[vite]: https://vite.dev/
+[pnpm]: https://pnpm.io/
+[cloudflare]: https://www.cloudflare.com/
+[alexandria]: https://www.cloudflare.com/lp/project-alexandria/
+[badge-app]: https://img.shields.io/badge/Dotlo-Open_App-2947D1?style=for-the-badge
+[badge-license]: https://img.shields.io/badge/License-AGPLv3-315B45?style=for-the-badge
+[badge-build]: https://img.shields.io/github/actions/workflow/status/dolot-org/dolot/build.yml?branch=main&style=for-the-badge&logo=githubactions&logoColor=white&label=Build
+[badge-releases]: https://img.shields.io/badge/GitHub-Releases-24292F?style=for-the-badge&logo=github&logoColor=white
+[badge-workers]: https://img.shields.io/badge/Cloudflare-Workers-B44E12?style=for-the-badge&logo=cloudflare&logoColor=white
+[badge-d1]: https://img.shields.io/badge/Cloudflare-D1-B44E12?style=for-the-badge&logo=cloudflare&logoColor=white
+[badge-dns]: https://img.shields.io/badge/Cloudflare-DNS-B44E12?style=for-the-badge&logo=cloudflare&logoColor=white
+[badge-passkeys]: https://img.shields.io/badge/Authentication-Passkeys-324E76?style=for-the-badge
+[badge-react]: https://img.shields.io/badge/Frontend-React-054F66?style=for-the-badge&logo=react&logoColor=white
+[badge-typescript]: https://img.shields.io/badge/Language-TypeScript-235A97?style=for-the-badge&logo=typescript&logoColor=white
+[badge-vite]: https://img.shields.io/badge/Bundler-Vite-5336B3?style=for-the-badge&logo=vite&logoColor=white
+[badge-pnpm]: https://img.shields.io/badge/Packages-pnpm-76510B?style=for-the-badge&logo=pnpm&logoColor=white
+[badge-mcp]: https://img.shields.io/badge/MCP-Rust-774330?style=for-the-badge&logo=rust&logoColor=white
+[badge-cloudflare]: https://img.shields.io/badge/Friend_Link-Cloudflare-B44E12?style=for-the-badge&logo=cloudflare&logoColor=white

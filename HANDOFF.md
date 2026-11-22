@@ -1,5 +1,5 @@
-# 项目交接
+# Project Handoff
 
-Dotlo 的 Worker API、React PWA 和 D1 迁移已实现。见 [README](README.md) 了解模拟 DNS、首次创建管理员和本地开发步骤。
+Dotlo includes a Cloudflare Worker API, a React PWA, and a D1 database. The [README](README.md) covers local setup with simulated DNS, administrator bootstrap, runtime configuration, and the MCP client.
 
-GitHub Actions 的 Build 工作流负责 TypeScript 编译、PWA 构建和 Worker 打包，并上传 `dotlo-build` 产物。此工作流使用 Wrangler 的 dry run，不执行部署。
+The [Build workflow](.github/workflows/build.yml) type-checks the project, builds the PWA, and packages the Worker using a Wrangler dry run. Each successful run uploads the `dotlo-build` artifact for manual deployment.
