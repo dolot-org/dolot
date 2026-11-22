@@ -12,7 +12,7 @@ import { rateLimit } from '../lib/guard';
 import { fail, readBody } from '../lib/http';
 import { extraData, findConflict, listRecordRows, publishRecords, recordDto, removeSubdomain, rowFields, toPayload } from '../lib/records';
 import { currentUser, pwaGuard, requireUser } from '../lib/session';
-import { getSettings } from '../lib/settings';
+import { DOMAIN_LIMIT_SQL, domainCapacity, getSettings } from '../lib/settings';
 import { canonicalCode, cleanText, clientIp, DAY, groupCode, isUniqueError, now, randomId, sha256Hex, transferCode } from '../lib/util';
 
 export const domains = new Hono<AppEnv>();
@@ -54,7 +54,11 @@ domains.get('/check', async (c) => {
   if (!root) fail(404, 'not_found');
   const label = input.data.label;
   const check = await checkName(c.env.DB, root, label);
-  const code = check.code ?? (root.status === 'active' ? null : 'root_unavailable');
+  let code = check.code ?? (root.status === 'active' ? null : 'root_unavailable');
+  if (!code) {
+    const capacity = await domainCapacity(c.env.DB);
+    if (capacity && capacity.assigned >= capacity.limit) code = 'domain_capacity_reached';
+  }
   return c.json({
     fqdn: label + '.' + root.domain, available: code === null, code,
     message: code ? formatMessage(code, c.get('lang'), check.params) : null,
@@ -120,7 +124,8 @@ domains.post('/', async (c) => {
        WHERE EXISTS (SELECT 1 FROM roots WHERE id = ?2 AND status = 'active')
        AND EXISTS (SELECT 1 FROM users WHERE id = ?5 AND status = 'active')
        AND NOT EXISTS (SELECT 1 FROM reserved WHERE label = ?3)
-       AND (?10 IS NULL OR (SELECT COUNT(*) FROM subdomains WHERE user_id = ?5) < ?10)
+       AND (SELECT COUNT(*) FROM subdomains WHERE user_id = ?5) < ?10
+       AND (SELECT COUNT(*) FROM subdomains) < ${DOMAIN_LIMIT_SQL}
        AND (?11 = 0 OR (SELECT COUNT(*) FROM audit WHERE actor_id = ?5 AND action = 'subdomain.claim' AND created_at >= ?12) < ?11)`,
     ).bind(id, root.id, body.label, fqdn, user.id, root.require_review ? 'pending' : 'active', cleanText(body.note, 200), t,
       root.require_review || !root.term_days ? null : t + root.term_days * DAY, quota,
@@ -131,10 +136,12 @@ domains.post('/', async (c) => {
     const [inserted] = await DB.batch([claim, claimAudit]);
     if (!inserted.meta.changes) {
       const latest = await userQuota(DB, user, settings);
-      if (latest.quota !== null && latest.used >= latest.quota) fail(409, 'quota_reached', { quota: latest.quota });
+      if (latest.used >= latest.quota) fail(409, 'quota_reached', { quota: latest.quota });
       const checkedAgain = await checkName(DB, root, body.label);
       if (checkedAgain.code) fail(409, checkedAgain.code, checkedAgain.params);
       if ((await getRoot(DB, root.id))?.status !== 'active') fail(409, 'root_unavailable');
+      const capacity = await domainCapacity(DB);
+      if (capacity && capacity.assigned >= capacity.limit) fail(409, 'domain_capacity_reached');
       fail(429, 'claim_limit');
     }
   } catch (e) {
@@ -324,16 +331,20 @@ transfers.post('/accept', async (c) => {
   const user = currentUser(c);
   return withDomainLock(DB, sub.id, async () => {
     const { quota, used } = await userQuota(DB, user, await getSettings(DB));
-    if (quota !== null && used >= quota) fail(409, 'quota_reached', { quota });
+    if (used >= quota) fail(409, 'quota_reached', { quota });
     const t = now();
     const result = await DB.prepare(
       `UPDATE subdomains SET user_id = ?1, transfer_code = NULL, transfer_expires_at = NULL, updated_at = ?2
        WHERE id = ?3 AND user_id = ?4 AND transfer_code = ?5 AND transfer_expires_at > ?2 AND status = 'active'
        AND (expires_at IS NULL OR expires_at > ?2)
        AND EXISTS (SELECT 1 FROM users WHERE id = ?1 AND status = 'active')
-       AND (?6 IS NULL OR (SELECT COUNT(*) FROM subdomains WHERE user_id = ?1) < ?6)`,
+       AND (SELECT COUNT(*) FROM subdomains WHERE user_id = ?1) < ?6`,
     ).bind(user.id, t, sub.id, sub.user_id, hash, quota).run();
-    if (!result.meta.changes) fail(409, 'transfer_invalid');
+    if (!result.meta.changes) {
+      const latest = await userQuota(DB, user, await getSettings(DB));
+      if (latest.used >= latest.quota) fail(409, 'quota_reached', { quota: latest.quota });
+      fail(409, 'transfer_invalid');
+    }
     await subAudit(c, sub, 'subdomain.transfer.accept').run();
     return c.json({ id: sub.id });
   });

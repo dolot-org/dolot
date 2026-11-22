@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { checkLabel, cleanHost, DEFAULT_ALLOWED_TYPES, isHostname, RECORD_TYPES } from '../../shared/dns';
-import { REPORT_CATEGORIES, SUB_STATUSES, type AdminReport, type AdminStats, type AdminUser, type CfZoneInfo, type Paged, type ReservedName, type SubStatus, type SyncResult } from '../../shared/types';
+import { MAX_DOMAINS_PER_ACCOUNT, REPORT_CATEGORIES, SUB_STATUSES, type AdminReport, type AdminStats, type AdminUser, type CfZoneInfo, type Paged, type ReservedName, type SubStatus, type SyncResult } from '../../shared/types';
 import type { AppEnv, Ctx, UserRow } from '../env';
 import { activityDto, auditStmt, type AuditRow } from '../lib/audit';
 import { cf, dnsMode, dnsProvider } from '../lib/cloudflare';
@@ -222,7 +222,8 @@ admin.get('/users', async (c) => {
     FROM users u WHERE u.username LIKE ?1 ESCAPE '\\' OR u.display_name LIKE ?1 ESCAPE '\\'`;
   return c.json(await paginate(c, query, 'u.created_at DESC, u.id DESC', [q], (row: UserCounts): AdminUser => ({
     id: row.id, username: row.username, displayName: row.display_name, role: row.role, status: row.status,
-    banReason: row.ban_reason, quota: row.quota, contact: row.contact, createdAt: row.created_at,
+    banReason: row.ban_reason, quota: row.quota === null ? null : Math.min(row.quota, MAX_DOMAINS_PER_ACCOUNT),
+    contact: row.contact, createdAt: row.created_at,
     lastLoginAt: row.last_login_at, subdomainCount: row.subdomain_count, passkeyCount: row.passkey_count,
   })));
 });
@@ -232,7 +233,7 @@ admin.patch('/users/:id', async (c) => {
   const id = c.req.param('id');
   const body = await readBody(c, z.object({
     role: z.enum(['admin', 'user']).optional(), status: z.enum(['active', 'banned']).optional(),
-    banReason: z.string().max(200).optional(), quota: z.number().int().min(0).max(1000).nullable().optional(),
+    banReason: z.string().max(200).optional(), quota: z.number().int().min(0).max(MAX_DOMAINS_PER_ACCOUNT).nullable().optional(),
   }));
   const user = await DB.prepare('SELECT * FROM users WHERE id = ?').bind(id).first<UserRow>();
   if (!user) fail(404, 'user_not_found');
@@ -319,7 +320,8 @@ admin.delete('/reserved/:label', async (c) => {
 admin.get('/settings', async (c) => c.json(await getSettings(c.env.DB)));
 admin.patch('/settings', async (c) => {
   const body = await readBody(c, z.object({
-    registrationOpen: z.boolean(), defaultQuota: z.number().int().min(0).max(1000), dailyClaimLimit: z.number().int().min(0).max(1000),
+    registrationOpen: z.boolean(), defaultQuota: z.number().int().min(0).max(MAX_DOMAINS_PER_ACCOUNT),
+    totalDomainLimit: z.number().int().min(0), dailyClaimLimit: z.number().int().min(0).max(1000),
     announcement: z.string().max(1000), contactEmail: z.union([z.literal(''), z.email()]),
   }).partial());
   await saveSettings(c.env.DB, body);

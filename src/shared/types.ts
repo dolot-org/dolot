@@ -11,6 +11,7 @@ export type DnsMode = 'cloudflare' | 'mock' | 'unconfigured';
 
 export const REPORT_CATEGORIES: readonly ReportCategory[] = ['phishing', 'malware', 'spam', 'illegal', 'abuse', 'other'];
 export const SUB_STATUSES: readonly SubStatus[] = ['active', 'pending', 'suspended', 'expired'];
+export const MAX_DOMAINS_PER_ACCOUNT = 1;
 
 export interface Me {
   id: string;
@@ -126,6 +127,7 @@ export interface PublicConfig {
   contactEmail: string;
   roots: RootDomain[];
   stats: { subdomains: number; users: number };
+  domainCapacity: { assigned: number; limit: number };
 }
 
 export interface Availability {
@@ -195,6 +197,7 @@ export interface ReservedName {
 export interface SiteSettings {
   registrationOpen: boolean;
   defaultQuota: number;
+  totalDomainLimit: number;
   dailyClaimLimit: number;
   announcement: string;
   contactEmail: string;

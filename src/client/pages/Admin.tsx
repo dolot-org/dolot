@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { Link, NavLink, Route, Routes, useParams, useSearchParams } from 'react-router';
 import { DEFAULT_ALLOWED_TYPES, RECORD_TYPES, recordValue } from '../../shared/dns';
 import {
-  SUB_STATUSES, type ActivityItem, type AdminReport, type AdminRoot, type AdminStats, type AdminSubdomain, type AdminUser,
+  MAX_DOMAINS_PER_ACCOUNT, SUB_STATUSES, type ActivityItem, type AdminReport, type AdminRoot, type AdminStats, type AdminSubdomain, type AdminUser,
   type CfZoneInfo, type DnsRecord, type Paged, type ReservedName, type SiteSettings, type SyncResult,
 } from '../../shared/types';
 import { DomainName, DomainStatus, useStatus } from '../components/DomainName';
@@ -311,7 +311,7 @@ function UserRow({ row }: { row: AdminUser }) {
           <option value="active">{tr('正常', 'Active')}</option><option value="banned">{tr('停用', 'Ban')}</option>
         </select></Field>
         <Field label={tr('专属配额', 'Custom quota')} hint={tr('留空使用默认值', 'Leave empty for the default')}>
-          <input name="quota" type="number" min={0} max={1000} defaultValue={row.quota ?? ''} />
+          <input name="quota" type="number" min={0} max={MAX_DOMAINS_PER_ACCOUNT} defaultValue={row.quota ?? ''} />
         </Field>
         <Field label={tr('停用原因', 'Ban reason')}><input name="banReason" maxLength={200} defaultValue={row.banReason ?? ''} /></Field>
       </div>
@@ -419,7 +419,8 @@ function Settings() {
       const fields = formData(event);
       void action.run(async () => {
         await api('/admin/settings', 'PATCH', {
-          registrationOpen: fields.has('registrationOpen'), defaultQuota: Number(fields.get('defaultQuota')), dailyClaimLimit: Number(fields.get('dailyClaimLimit')),
+          registrationOpen: fields.has('registrationOpen'), defaultQuota: Number(fields.get('defaultQuota')),
+          totalDomainLimit: Number(fields.get('totalDomainLimit')), dailyClaimLimit: Number(fields.get('dailyClaimLimit')),
           announcement: textValue(fields, 'announcement'), contactEmail: textValue(fields, 'contactEmail'),
         });
         await invalidate('admin-settings', 'admin-audit', 'config', 'me');
@@ -427,7 +428,12 @@ function Settings() {
     }}>
       <label className="check"><input type="checkbox" name="registrationOpen" defaultChecked={settings.registrationOpen} />{tr('开放账户注册', 'Allow account registration')}</label>
       <div className="form-grid">
-        <Field label={tr('默认域名配额', 'Default domain quota')}><input name="defaultQuota" required type="number" min={0} max={1000} defaultValue={settings.defaultQuota} /></Field>
+        <Field label={tr('默认账户配额', 'Default account quota')}>
+          <input name="defaultQuota" required type="number" min={0} max={MAX_DOMAINS_PER_ACCOUNT} defaultValue={settings.defaultQuota} />
+        </Field>
+        <Field label={tr('全站域名总量上限', 'Total domain limit')}>
+          <input name="totalDomainLimit" required type="number" min={0} defaultValue={settings.totalDomainLimit} />
+        </Field>
         <Field label={tr('每日注册上限', 'Daily claim limit')} hint={tr('0 表示不限', '0 for unlimited')}>
           <input name="dailyClaimLimit" required type="number" min={0} max={1000} defaultValue={settings.dailyClaimLimit} />
         </Field>

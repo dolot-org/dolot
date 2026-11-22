@@ -1,12 +1,21 @@
-import type { SiteSettings } from '../../shared/types';
+import { MAX_DOMAINS_PER_ACCOUNT, type PublicConfig, type SiteSettings } from '../../shared/types';
 
 export const DEFAULT_SETTINGS: SiteSettings = {
   registrationOpen: true,
-  defaultQuota: 3,
+  defaultQuota: MAX_DOMAINS_PER_ACCOUNT,
+  totalDomainLimit: 100,
   dailyClaimLimit: 5,
   announcement: '',
   contactEmail: '',
 };
+
+export const DOMAIN_LIMIT_SQL = `COALESCE((SELECT CAST(value AS INTEGER) FROM settings
+  WHERE key = 'totalDomainLimit' AND value <> '' AND value NOT GLOB '*[^0-9]*'), ${DEFAULT_SETTINGS.totalDomainLimit})`;
+
+export async function domainCapacity(db: D1Database) {
+  return db.prepare(`SELECT COUNT(*) AS assigned, ${DOMAIN_LIMIT_SQL} AS "limit" FROM subdomains`)
+    .first<PublicConfig['domainCapacity']>();
+}
 
 export async function getSettings(db: D1Database): Promise<SiteSettings> {
   const { results } = await db.prepare('SELECT key, value FROM settings').all<{ key: string; value: string }>();
@@ -20,7 +29,9 @@ export async function getSettings(db: D1Database): Promise<SiteSettings> {
       // 忽略损坏的值
     }
   }
-  return out as unknown as SiteSettings;
+  const settings = out as unknown as SiteSettings;
+  settings.defaultQuota = Math.min(settings.defaultQuota, MAX_DOMAINS_PER_ACCOUNT);
+  return settings;
 }
 
 export async function saveSettings(db: D1Database, patch: Partial<SiteSettings>) {

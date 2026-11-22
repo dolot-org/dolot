@@ -1,6 +1,6 @@
 import { checkLabel, DEFAULT_ALLOWED_TYPES, RECORD_TYPES, type RecordRules, type RecordType } from '../../shared/dns';
 import type { MessageCode, MessageParams } from '../../shared/messages';
-import type { AdminRoot, AdminSubdomain, RootDomain, RootStatus, SiteSettings, Subdomain, SubStatus } from '../../shared/types';
+import { MAX_DOMAINS_PER_ACCOUNT, type AdminRoot, type AdminSubdomain, type RootDomain, type RootStatus, type SiteSettings, type Subdomain, type SubStatus } from '../../shared/types';
 import type { UserRow } from '../env';
 import { DAY, parseJson } from './util';
 
@@ -119,11 +119,10 @@ export function renewInfo(sub: SubRow, root: RootRow, t: number) {
   return { renewable, opensAt, purgeAt };
 }
 
-/** 返回有效配额 null 表示不限 */
 export async function userQuota(db: D1Database, user: Pick<UserRow, 'id' | 'role' | 'quota'>, settings: SiteSettings) {
   const row = await db.prepare('SELECT COUNT(*) AS n FROM subdomains WHERE user_id = ?').bind(user.id).first<{ n: number }>();
   const used = row?.n ?? 0;
-  const quota = user.quota ?? (user.role === 'admin' ? null : settings.defaultQuota);
+  const quota = Math.min(user.quota ?? (user.role === 'admin' ? MAX_DOMAINS_PER_ACCOUNT : settings.defaultQuota), MAX_DOMAINS_PER_ACCOUNT);
   return { quota, used };
 }
 

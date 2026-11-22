@@ -6,24 +6,26 @@ import type { AppEnv } from '../env';
 import { rootDto, type RootRow } from '../lib/domains';
 import { rateLimit, verifyTurnstile } from '../lib/guard';
 import { fail, readBody } from '../lib/http';
-import { getSettings } from '../lib/settings';
+import { DEFAULT_SETTINGS, domainCapacity, getSettings } from '../lib/settings';
 import { clientIp, now, randomId, sha256Hex } from '../lib/util';
 
 export const publicRoutes = new Hono<AppEnv>();
 
 publicRoutes.get('/config', async (c) => {
   const { DB } = c.env;
-  const [settings, roots, counts] = await Promise.all([
+  const [settings, roots, counts, capacity] = await Promise.all([
     getSettings(DB),
     DB.prepare("SELECT * FROM roots WHERE status = 'active' ORDER BY sort, domain").all<RootRow>(),
     DB.prepare("SELECT (SELECT COUNT(*) FROM users WHERE status = 'active') AS users, (SELECT COUNT(*) FROM subdomains WHERE status = 'active') AS subdomains")
       .first<PublicConfig['stats']>(),
+    domainCapacity(DB),
   ]);
   const result: PublicConfig = {
     siteName: c.env.RP_NAME || 'Dotlo', registrationOpen: settings.registrationOpen, requirePwa: c.env.REQUIRE_PWA !== 'false',
     turnstileSiteKey: c.env.TURNSTILE_SECRET ? c.env.TURNSTILE_SITE_KEY ?? null : null,
     announcement: settings.announcement, contactEmail: settings.contactEmail,
     roots: roots.results.map(rootDto), stats: counts ?? { users: 0, subdomains: 0 },
+    domainCapacity: capacity ?? { assigned: 0, limit: DEFAULT_SETTINGS.totalDomainLimit },
   };
   return c.json(result);
 });

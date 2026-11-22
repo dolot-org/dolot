@@ -35,6 +35,7 @@ export function Welcome({ config, signedIn }: { config: PublicConfig; signedIn: 
   const pwa = usePwa();
   const suffixes = config.roots.map((root) => '.' + root.domain);
   const signin = config.requirePwa && !pwa.standalone ? '/install' : '/signin';
+  const remaining = Math.max(0, config.domainCapacity.limit - config.domainCapacity.assigned);
   return <div className="welcome stack">
     <section className="hero">
       <div className="hero-text stack">
@@ -56,6 +57,7 @@ export function Welcome({ config, signedIn }: { config: PublicConfig; signedIn: 
     <Panel title={tr('查找你的域名', 'Find your domain')}><ClaimBox roots={config.roots} /></Panel>
     <div className="public-stats">
       <span><strong>{config.stats.subdomains.toLocaleString()}</strong> {tr('有效域名', 'active domains')}</span>
+      <span><strong>{remaining.toLocaleString()}</strong> {tr('剩余域名名额', 'domain slots remaining')}</span>
       <span><strong>{config.stats.users.toLocaleString()}</strong> {tr('账户', 'accounts')}</span>
     </div>
   </div>;

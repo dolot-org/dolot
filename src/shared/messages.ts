@@ -33,6 +33,7 @@ export const MESSAGES = {
   label_taken: ['这个名称已被注册', 'This name is already registered'],
   fqdn_too_long: ['完整域名超过 253 个字符', 'The full domain exceeds 253 characters'],
   quota_reached: ['已达到注册上限 {quota} 个', 'You have reached your limit of {quota} names'],
+  domain_capacity_reached: ['本站域名名额已满', 'All domain slots are currently assigned'],
   claim_limit: ['今天注册的次数已用完 明天再来', 'You have used today’s registrations, come back tomorrow'],
   subdomain_suspended: ['域名已被暂停 无法修改', 'This name is suspended and cannot be changed'],
   subdomain_expired: ['域名已过期 续期后才能修改', 'This name has expired, renew it to make changes'],
