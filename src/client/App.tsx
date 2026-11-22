@@ -8,7 +8,8 @@ import { usePwa } from './lib/pwa';
 import { Account } from './pages/Account';
 import { Admin } from './pages/Admin';
 import { Claim, DomainDetail, Home } from './pages/Domains';
-import { InstallGate, NotFound, Report, SignIn, SignUp, Terms, Welcome } from './pages/Public';
+import { About, Agreement, Terms } from './pages/Legal';
+import { InstallGate, NotFound, Report, SignIn, SignUp, Welcome } from './pages/Public';
 
 function Access({ me, installRequired, role, children }: {
   me: Me | null; installRequired: boolean; role?: 'admin'; children: ReactNode;
@@ -29,12 +30,17 @@ export function App() {
   const config = configQuery.data;
   const me = meQuery.data ?? null;
   const needsInstall = Boolean(config?.requirePwa && !pwa.standalone);
+  const information = <>
+    <Route path="about" element={<About contact={config?.contactEmail} />} />
+    <Route path="agreement" element={<Agreement />} />
+    <Route path="terms" element={<Terms />} />
+  </>;
   const pending = <QueryState error={configQuery.error ?? meQuery.error} retry={() => {
     if (configQuery.error) void configQuery.refetch();
     if (meQuery.error) void meQuery.refetch();
   }} />;
   if (!config || meQuery.isPending || meQuery.isError) {
-    return <Routes><Route element={<AppShell me={null} />}><Route path="*" element={pending} /></Route></Routes>;
+    return <Routes><Route element={<AppShell me={null} />}>{information}<Route path="*" element={pending} /></Route></Routes>;
   }
   const authPage = (page: ReactNode) => {
     if (needsInstall) return <InstallGate next={location.pathname} />;
@@ -54,7 +60,7 @@ export function App() {
       <Route path="account" element={signedIn(me && <Account me={me} />)} />
       <Route path="admin/*" element={signedIn(<Admin />, 'admin')} />
       <Route path="report" element={<Report config={config} />} />
-      <Route path="terms" element={<Terms contact={config.contactEmail} />} />
+      {information}
       <Route path="*" element={<NotFound />} />
     </Route>
   </Routes>;

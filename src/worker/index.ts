@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import { formatMessage } from '../shared/messages';
+import { sourceLinks } from '../shared/source';
 import type { AppEnv, Env } from './env';
 import { ApiError, fail } from './lib/http';
 import { maintenance } from './lib/maintenance';
@@ -18,6 +19,8 @@ app.use('*', async (c, next) => {
   c.set('lang', /^en\b/i.test(c.req.header('accept-language') ?? '') ? 'en' : 'zh');
   c.header('Cache-Control', 'no-store');
   c.header('X-Content-Type-Options', 'nosniff');
+  const source = sourceLinks(c.env.SOURCE_REPOSITORY, c.env.SOURCE_REVISION);
+  c.header('Link', `<${source.archive}>; rel="related"; title="Corresponding Source"`);
   if (!['GET', 'HEAD', 'OPTIONS'].includes(c.req.method)) {
     if (c.req.header('x-dotlo-client') !== 'web' || c.req.header('sec-fetch-site') === 'cross-site') fail(403, 'csrf');
     rpInfo(c);

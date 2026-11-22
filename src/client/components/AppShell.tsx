@@ -2,6 +2,7 @@ import { Globe2, Moon, Shield, Sun, UserRound } from 'lucide-react';
 import { Link, NavLink, Outlet } from 'react-router';
 import type { Me } from '../../shared/types';
 import { setPreferences, useLocale } from '../lib/preferences';
+import { source } from '../lib/source';
 
 export function Logo() {
   return <Link className="logo" to="/" aria-label="Dotlo"><span className="logo-mark" aria-hidden="true"><i /></span><span>dotlo<span className="logo-period">.</span></span></Link>;
@@ -31,7 +32,13 @@ export function AppShell({ me }: { me: Me | null }) {
     <main className="container main" id="main"><Outlet /></main>
     <footer className="container footer">
       <span>Dotlo</span>
-      <div><Link to="/terms">{tr('使用条款', 'Terms')}</Link><Link to="/report">{tr('举报滥用', 'Report abuse')}</Link></div>
+      <div>
+        <Link to="/about">{tr('关于', 'About')}</Link>
+        <a className="text-link" href={source.archive}>{tr('下载对应源码', 'Download corresponding source')}</a>
+        <Link to="/agreement">{tr('用户协议', 'User Agreement')}</Link>
+        <Link to="/terms">{tr('服务条款', 'Terms of Service')}</Link>
+        <Link to="/report">{tr('举报滥用', 'Report abuse')}</Link>
+      </div>
     </footer>
   </div>;
 }

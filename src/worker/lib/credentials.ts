@@ -30,7 +30,12 @@ export function transportsOf(row: CredentialRow) {
   return parseJson<AuthenticatorTransportFuture[]>(row.transports, []);
 }
 
-export async function registrationOptions(c: Ctx, kind: 'register' | 'add-passkey', user: { id: string; username: string; displayName: string }, existing: CredentialRow[] = []) {
+export async function registrationOptions(
+  c: Ctx,
+  kind: 'register' | 'add-passkey',
+  user: { id: string; username: string; displayName: string; consent?: { version: string; acceptedAt: number } },
+  existing: CredentialRow[] = [],
+) {
   const rp = rpInfo(c);
   const options = await generateRegistrationOptions({
     rpID: rp.rpID, rpName: rp.rpName, userID: new Uint8Array(new TextEncoder().encode(user.id)),

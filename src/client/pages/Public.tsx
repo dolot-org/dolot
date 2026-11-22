@@ -1,6 +1,7 @@
 import { Download, KeyRound, Share, ShieldCheck } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
+import { LEGAL_VERSION } from '../../shared/legal';
 import { REPORT_CATEGORIES, type PublicConfig, type ReportCategory } from '../../shared/types';
 import { ClaimBox } from '../components/ClaimBox';
 import { Turnstile } from '../components/Turnstile';
@@ -89,15 +90,18 @@ export function SignUp({ config }: { config: PublicConfig }) {
   const location = useLocation();
   const [token, setToken] = useState('');
   const [revision, setRevision] = useState(0);
+  const [accepted, setAccepted] = useState(false);
   const next = (location.state as { next?: string } | null)?.next ?? '/home';
   return <div className="narrow stack">
     <PageTitle title={tr('创建账户', 'Create an account')} subtitle={tr('使用 Passkey 登录和保护你的域名', 'Use a passkey to sign in and protect your domains')} />
     <Panel title={tr('账户资料', 'Account details')}>
       {!config.registrationOpen ? <Empty>{tr('暂未开放新账户注册', 'Sign-ups are currently closed')}</Empty> : <form className="stack" onSubmit={(event) => {
         const form = formData(event);
+        const legalVersion = textValue(form, 'legalVersion');
+        if (legalVersion !== LEGAL_VERSION) return;
         void action.run(async () => {
           try {
-            setMe(await signUp({ username: textValue(form, 'username'), displayName: textValue(form, 'name'), token: token || undefined }));
+            setMe(await signUp({ username: textValue(form, 'username'), displayName: textValue(form, 'name'), legalVersion, token: token || undefined }));
             navigate(next, { replace: true });
           } finally {
             setRevision((value) => value + 1);
@@ -108,9 +112,18 @@ export function SignUp({ config }: { config: PublicConfig }) {
           <input name="username" required minLength={3} maxLength={24} autoCapitalize="none" autoComplete="username" />
         </Field>
         <Field label={tr('显示名称', 'Display name')}><input name="name" maxLength={50} autoComplete="nickname" /></Field>
-        <label className="check"><input type="checkbox" required /><span>{tr('我同意', 'I agree to the')} <Link className="text-link" to="/terms" target="_blank">{tr('使用条款', 'terms of use')}</Link></span></label>
+        <div className="check">
+          <input id="legal-consent" type="checkbox" name="legalVersion" value={LEGAL_VERSION} checked={accepted} required
+            onChange={(event) => setAccepted(event.target.checked)} aria-labelledby="legal-consent-text" />
+          <span id="legal-consent-text">
+            <label htmlFor="legal-consent">{tr('我已阅读并同意', 'I have read and agree to the')}</label>{' '}
+            <Link className="text-link" to="/agreement" target="_blank" rel="noopener">{tr('用户协议', 'User Agreement')}</Link>{' '}
+            {tr('和', 'and')}{' '}
+            <Link className="text-link" to="/terms" target="_blank" rel="noopener">{tr('服务条款', 'Terms of Service')}</Link>
+          </span>
+        </div>
         <Turnstile siteKey={config.turnstileSiteKey} revision={revision} update={setToken} />
-        <button className="button primary fit" disabled={action.busy || Boolean(config.turnstileSiteKey && !token)}><KeyRound size={18} />{tr('创建 Passkey', 'Create passkey')}</button>
+        <button className="button primary fit" disabled={action.busy || !accepted || Boolean(config.turnstileSiteKey && !token)}><KeyRound size={18} />{tr('创建 Passkey', 'Create passkey')}</button>
         <ActionFeedback action={action} />
       </form>}
       <Link className="text-link fit" to="/signin" state={location.state}>{tr('已有账户 登录', 'Already registered Sign in')}</Link>
@@ -157,23 +170,6 @@ export function Report({ config }: { config: PublicConfig }) {
         <ActionFeedback action={action} />
       </form>}
     {config.contactEmail && <a className="text-link" href={'mailto:' + config.contactEmail}>{config.contactEmail}</a>}
-  </div>;
-}
-
-export function Terms({ contact }: { contact: string }) {
-  const { tr } = useLocale();
-  return <div className="narrow stack">
-    <PageTitle title={tr('使用条款', 'Terms of use')} />
-    <Panel title={tr('域名使用', 'Using your domain')}>
-      <p>{tr('请只将 Dotlo 域名用于合法用途 禁止钓鱼 恶意软件 垃圾信息及其他滥用行为', 'Use Dotlo domains for lawful purposes only Do not use them for phishing malware spam or other abuse')}</p>
-      <p>{tr('域名须遵守所选后缀的配额和期限 过期域名可能在宽限期后被回收', 'Suffix quotas and registration periods apply Expired names may be released after the grace period')}</p>
-    </Panel>
-    <Panel title={tr('账户和举报', 'Accounts and reports')}>
-      <p>{tr('请保管好 Passkey 和转移码 Dotlo 可能暂停涉嫌滥用的域名或账户', 'Keep passkeys and transfer codes safe Dotlo may suspend domains or accounts involved in abuse')}</p>
-      <p>{tr('Dotlo 保存维护账户 域名和处理举报所需的资料', 'Dotlo stores the information needed to maintain accounts and domains and handle reports')}</p>
-      <Link className="text-link" to="/report">{tr('举报滥用', 'Report abuse')}</Link>
-      {contact && <a className="text-link" href={'mailto:' + contact}>{contact}</a>}
-    </Panel>
   </div>;
 }
 

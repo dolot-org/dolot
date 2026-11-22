@@ -27,6 +27,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Compile TypeScript and build PWA
+        env:
+          VITE_SOURCE_REPOSITORY: ${{ github.server_url }}/${{ github.repository }}
+          VITE_SOURCE_REVISION: ${{ github.sha }}
         run: pnpm build
       - name: Bundle Cloudflare Worker
         run: pnpm check:worker

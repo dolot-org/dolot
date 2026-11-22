@@ -59,3 +59,5 @@ GitHub Actions 的 [Build 工作流](.github/workflows/build.yml) 在推送到 `
 ## 许可证
 
 Dotlo 采用 GNU Affero General Public License 第 3 版（`AGPL-3.0-only`）。完整条款见 [LICENSE](LICENSE)。
+
+自托管时请公开实际部署的源码提交。构建前端时将 `VITE_SOURCE_REPOSITORY` 与 `VITE_SOURCE_REVISION` 分别设为公开的 GitHub 仓库地址和完整提交 SHA，并在 Worker 中设置相同的 `SOURCE_REPOSITORY` 与 `SOURCE_REVISION`。关于页、页脚和 API 响应头会提供对应版本的源码入口。

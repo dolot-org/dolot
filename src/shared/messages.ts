@@ -15,6 +15,7 @@ export const MESSAGES = {
   rate_limited: ['操作太频繁 请稍后再试', 'Too many attempts, try again later'],
   turnstile_failed: ['人机验证未通过 请重试', 'Verification failed, try again'],
   registration_closed: ['暂未开放新账户注册', 'New sign-ups are closed for now'],
+  legal_consent_required: ['请阅读并同意当前版本的用户协议和服务条款', 'Read and accept the current User Agreement and Terms of Service'],
   username_invalid: ['用户名需为 3 到 24 位小写字母 数字 下划线或连字符 首尾为字母或数字', 'Usernames are 3 to 24 lowercase letters, digits, underscores or hyphens, starting and ending with a letter or digit'],
   username_taken: ['这个用户名已被使用', 'This username is taken'],
   passkey_failed: ['Passkey 验证失败 请重试', 'Passkey verification failed, try again'],

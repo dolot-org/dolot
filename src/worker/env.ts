@@ -5,6 +5,8 @@ import type { Role, UserStatus } from '../shared/types';
 export interface Env {
   DB: D1Database;
   ASSETS: Fetcher;
+  SOURCE_REPOSITORY?: string;
+  SOURCE_REVISION?: string;
   /** Cloudflare API 令牌 需要 Zone Read 与 DNS Edit 权限 */
   CF_API_TOKEN?: string;
   /** 设为 true 时不调用 Cloudflare 只在本地模拟 */

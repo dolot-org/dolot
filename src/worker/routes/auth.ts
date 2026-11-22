@@ -2,6 +2,7 @@ import { generateAuthenticationOptions, verifyAuthenticationResponse, type Authe
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { normalizeUsername, USERNAME_RE } from '../../shared/dns';
+import { LEGAL_VERSION } from '../../shared/legal';
 import type { Me } from '../../shared/types';
 import type { AppEnv, Ctx, UserRow } from '../env';
 import { auditStmt } from '../lib/audit';
@@ -38,14 +39,17 @@ auth.post('/register/options', pwaGuard, async (c) => {
   await rateLimit(DB, 'register:' + clientIp(c), 12, 3_600_000);
   const body = await readBody(c, z.object({
     username: z.string().max(100), displayName: z.string().max(50).optional(), token: z.string().max(2048).optional(),
+    legalVersion: z.string().max(40).optional(),
   }));
   const username = normalizeUsername(body.username);
   if (!USERNAME_RE.test(username)) fail(400, 'username_invalid');
   if (!(await getSettings(DB)).registrationOpen) fail(403, 'registration_closed');
+  if (body.legalVersion !== LEGAL_VERSION) fail(400, 'legal_consent_required');
+  const consent = { version: body.legalVersion, acceptedAt: now() };
   await verifyTurnstile(c, body.token);
   if (await DB.prepare('SELECT id FROM users WHERE username = ?').bind(username).first()) fail(409, 'username_taken');
   return c.json(await registrationOptions(c, 'register', {
-    id: randomId(16), username, displayName: cleanText(body.displayName ?? '', 50),
+    id: randomId(16), username, displayName: cleanText(body.displayName ?? '', 50), consent,
   }));
 });
 
@@ -55,9 +59,10 @@ auth.post('/register/verify', pwaGuard, async (c) => {
   if (!(await getSettings(DB)).registrationOpen) fail(403, 'registration_closed');
   const body = await readBody(c, verificationBody);
   const challenge = await takeChallenge(DB, body.challengeId, 'register');
-  const data = parseJson<{ username: string; displayName: string } | null>(challenge.data, null);
+  const data = parseJson<{ username: string; displayName: string; consent?: { version: string; acceptedAt: number } } | null>(challenge.data, null);
   const id = challenge.user_id;
   if (!id || !data) fail(400, 'passkey_failed');
+  if (data.consent?.version !== LEGAL_VERSION) fail(400, 'legal_consent_required');
   const credential = await credentialStatement(c, challenge, body.response, id);
   const t = now();
   const user: UserRow = {
@@ -69,6 +74,8 @@ auth.post('/register/verify', pwaGuard, async (c) => {
       DB.prepare('INSERT INTO users (id, username, display_name, role, created_at, last_login_at) VALUES (?, ?, ?, ?, ?, ?)')
         .bind(id, user.username, user.display_name, user.role, t, t),
       credential.statement,
+      DB.prepare('INSERT INTO user_agreements (user_id, version, accepted_at) VALUES (?, ?, ?)')
+        .bind(id, data.consent.version, data.consent.acceptedAt),
       auditStmt(DB, { actor: user, action: 'account.register', targetType: 'user', targetId: id, targetLabel: user.username, ip: clientIp(c) }),
     ]);
   } catch (error) {
