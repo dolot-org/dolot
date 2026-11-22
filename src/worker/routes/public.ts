@@ -1,15 +1,50 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
+import type { DirectoryDetail, DirectoryDomain, DirectoryRecord } from '../../shared/directory';
 import { cleanHost, isHostname } from '../../shared/dns';
-import { REPORT_CATEGORIES, type PublicConfig } from '../../shared/types';
+import { REPORT_CATEGORIES, type Paged, type PublicConfig } from '../../shared/types';
 import type { AppEnv } from '../env';
 import { rootDto, type RootRow } from '../lib/domains';
 import { rateLimit, verifyTurnstile } from '../lib/guard';
 import { fail, readBody } from '../lib/http';
 import { DEFAULT_SETTINGS, domainCapacity, getSettings } from '../lib/settings';
-import { clientIp, now, randomId, sha256Hex } from '../lib/util';
+import { clientIp, likePattern, now, pageParams, randomId, sha256Hex } from '../lib/util';
 
 export const publicRoutes = new Hono<AppEnv>();
+
+const listedDomain = "s.status = 'active' AND (s.expires_at IS NULL OR s.expires_at > ?)";
+const directoryFields = 's.fqdn, s.created_at AS registeredAt, s.expires_at AS expiresAt';
+
+publicRoutes.get('/directory', async (c) => {
+  const { DB } = c.env;
+  const { page, pageSize, offset } = pageParams(c, 20);
+  const time = now();
+  const pattern = likePattern(cleanHost(c.req.query('q') ?? '').slice(0, 253));
+  const matching = `FROM subdomains s WHERE ${listedDomain} AND s.fqdn LIKE ? ESCAPE '\\'`;
+  const [domains, count] = await Promise.all([
+    DB.prepare(`SELECT ${directoryFields} ${matching} ORDER BY s.created_at DESC, s.fqdn LIMIT ? OFFSET ?`)
+      .bind(time, pattern, pageSize, offset).all<DirectoryDomain>(),
+    DB.prepare(`SELECT COUNT(*) AS total ${matching}`).bind(time, pattern).first<{ total: number }>(),
+  ]);
+  return c.json({ items: domains.results, total: count?.total ?? 0, page, pageSize } satisfies Paged<DirectoryDomain>);
+});
+
+publicRoutes.get('/directory/:fqdn', async (c) => {
+  const fqdn = cleanHost(c.req.param('fqdn'));
+  if (!isHostname(fqdn)) fail(404, 'not_found');
+  const { results } = await c.env.DB.prepare(`
+    SELECT DISTINCT ${directoryFields}, r.name, r.type
+    FROM subdomains s LEFT JOIN records r ON r.subdomain_id = s.id AND r.cf_id IS NOT NULL
+    WHERE ${listedDomain} AND s.fqdn = ?
+    ORDER BY r.name, r.type
+  `).bind(now(), fqdn).all<DirectoryDomain & { name: string | null; type: DirectoryRecord['type'] | null }>();
+  const first = results[0];
+  if (!first) fail(404, 'not_found');
+  return c.json({
+    domain: { fqdn: first.fqdn, registeredAt: first.registeredAt, expiresAt: first.expiresAt },
+    records: results.flatMap(({ name, type }) => name && type ? [{ name, type }] : []),
+  } satisfies DirectoryDetail);
+});
 
 publicRoutes.get('/config', async (c) => {
   const { DB } = c.env;

@@ -7,6 +7,7 @@ import { useConfig, useMe } from './lib/api';
 import { usePwa } from './lib/pwa';
 import { Account } from './pages/Account';
 import { Admin } from './pages/Admin';
+import { Directory, DirectoryDomainPage } from './pages/Directory';
 import { Claim, DomainDetail, Home } from './pages/Domains';
 import { About, Agreement, Terms } from './pages/Legal';
 import { InstallGate, NotFound, Report, SignIn, SignUp, Welcome } from './pages/Public';
@@ -34,6 +35,8 @@ export function App() {
     <Route path="about" element={<About contact={config?.contactEmail} />} />
     <Route path="agreement" element={<Agreement />} />
     <Route path="terms" element={<Terms />} />
+    <Route path="directory" element={<Directory />} />
+    <Route path="directory/:fqdn" element={<DirectoryDomainPage />} />
   </>;
   const pending = <QueryState error={configQuery.error ?? meQuery.error} retry={() => {
     if (configQuery.error) void configQuery.refetch();

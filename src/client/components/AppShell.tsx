@@ -39,6 +39,7 @@ export function AppShell({ me }: { me: Me | null }) {
         <Logo />
         {me && <nav className="main-nav" aria-label={tr('主导航', 'Main navigation')}><NavLinks me={me} /></nav>}
         <div className="top-actions">
+          <NavLink className="button secondary directory-link" to="/directory">{tr('域名目录', 'Directory')}</NavLink>
           <button className="icon-button lang-button" type="button" onClick={() => setPreferences({ lang: lang === 'zh' ? 'en' : 'zh' })}
             aria-label={tr('切换到英语', 'Switch to Chinese')}>{lang === 'zh' ? 'EN' : '中'}</button>
           <button className="icon-button" type="button" onClick={() => setPreferences({ theme: dark ? 'light' : 'dark' })}

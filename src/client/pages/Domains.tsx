@@ -1,7 +1,7 @@
 import { ArrowLeft, CalendarClock, Clipboard, Download, Globe2, Info, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
-import { RECORD_TYPES, recordValue, zoneLine, type RecordInput } from '../../shared/dns';
+import { RECORD_TYPES, recordValue, zoneLine, type RecordInput, type RecordType } from '../../shared/dns';
 import type { ActivityItem, DnsRecord, Me, ResolveResult, RootDomain, Subdomain, SubdomainDetail, TransferPreview, TransferTicket } from '../../shared/types';
 import { ClaimBox } from '../components/ClaimBox';
 import { DomainName, DomainStatus } from '../components/DomainName';
@@ -117,7 +117,7 @@ function TransferIn({ canReceive }: { canReceive: boolean }) {
   </Panel>;
 }
 
-function ResolveBox({ name = '' }: { name?: string }) {
+export function ResolveBox({ name = '', type = 'A' }: { name?: string; type?: RecordType }) {
   const { tr } = useLocale();
   const [result, setResult] = useState<ResolveResult>();
   const action = useAction();
@@ -129,7 +129,7 @@ function ResolveBox({ name = '' }: { name?: string }) {
       void action.run(async () => setResult(await api<ResolveResult>('/domains/resolve?' + url)));
     }}>
       <Field label={tr('域名', 'Domain')}><input className="mono" name="name" defaultValue={name} maxLength={253} autoCapitalize="none" required /></Field>
-      <Field label={tr('记录类型', 'Record type')}><select name="type">{RECORD_TYPES.map((type) => <option key={type}>{type}</option>)}</select></Field>
+      <Field label={tr('记录类型', 'Record type')}><select name="type" defaultValue={type}>{RECORD_TYPES.map((option) => <option key={option}>{option}</option>)}</select></Field>
       <button className="button secondary" disabled={action.busy}><Search size={17} />{tr('查询', 'Look up')}</button>
     </form>
     {result && (result.answers.length ? <ul className="rows">

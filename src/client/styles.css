@@ -165,6 +165,7 @@ code, .mono { font-family: var(--mono); }
 .icon-button:active:not(:disabled) { transform: scale(.94); }
 .top-actions .icon-button { background: var(--inset); }
 .top-actions .icon-button:hover { background: var(--hover); }
+.top-actions .directory-link { min-height: 2.5rem; padding: .4rem .7rem; }
 .lang-button { font-weight: 700; font-size: .82rem; letter-spacing: .02em; }
 .skip { position: fixed; z-index: 30; left: 1rem; top: -5rem; padding: .7rem 1rem; border-radius: .75rem; background: var(--surface); }
 .skip:focus { top: 1rem; }
